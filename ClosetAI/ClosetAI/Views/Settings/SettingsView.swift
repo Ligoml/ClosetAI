@@ -1,14 +1,21 @@
 import SwiftUI
+import PhotosUI
 
 struct SettingsView: View {
     @StateObject private var settingsVM = SettingsViewModel()
     @EnvironmentObject var wardrobeVM: WardrobeViewModel
+
+    @State private var modelPhoto: UIImage?
+    @State private var showModelPhotoPicker = false
 
     var body: some View {
         NavigationView {
             List {
                 // API Configuration
                 apiSection
+
+                // Model Photo
+                modelPhotoSection
 
                 // Statistics
                 statisticsSection
@@ -24,6 +31,92 @@ struct SettingsView: View {
             .alert("已保存", isPresented: $settingsVM.showSavedAlert) {
                 Button("确定") {}
             }
+            .onAppear {
+                modelPhoto = settingsVM.loadModelPhoto()
+            }
+        }
+        .sheet(isPresented: $showModelPhotoPicker) {
+            PhotoPickerView(images: Binding(
+                get: { modelPhoto.map { [$0] } ?? [] },
+                set: { images in
+                    if let img = images.first {
+                        modelPhoto = img
+                        settingsVM.saveModelPhoto(img)
+                    }
+                }
+            ))
+        }
+    }
+
+    // MARK: - Model Photo Section
+
+    private var modelPhotoSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                if let photo = modelPhoto {
+                    HStack(spacing: 16) {
+                        Image(uiImage: photo)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 72, height: 96)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.systemGray4), lineWidth: 0.5))
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("已设置模特图")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("虚拟试穿时将自动使用此图片")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 12) {
+                                Button("更换") {
+                                    showModelPhotoPicker = true
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(AppColors.accent)
+
+                                Button("删除") {
+                                    settingsVM.clearModelPhoto()
+                                    modelPhoto = nil
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } else {
+                    Button {
+                        showModelPhotoPicker = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.crop.rectangle.badge.plus")
+                                .font(.title2)
+                                .foregroundColor(AppColors.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("上传模特图")
+                                    .foregroundColor(.primary)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("虚拟试穿时无需每次重新上传")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(Color(.systemGray3))
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        } header: {
+            Text("默认模特图")
+        } footer: {
+            Text("设置后，虚拟试穿页面将自动加载此模特图，省去每次手动选择的步骤。")
+                .font(.caption)
         }
     }
 
@@ -142,6 +235,27 @@ class SettingsViewModel: ObservableObject {
         showSavedAlert = true
     }
 
+    // MARK: - Model Photo
+
+    private let modelPhotoKey = "closetai.modelPhotoFilename"
+    private let modelPhotoFilename = "model_photo.jpg"
+
+    func loadModelPhoto() -> UIImage? {
+        guard UserDefaults.standard.string(forKey: modelPhotoKey) != nil else { return nil }
+        return ImageProcessingService.shared.loadImage(from: modelPhotoFilename)
+    }
+
+    func saveModelPhoto(_ image: UIImage) {
+        _ = ImageProcessingService.shared.saveImageToDocuments(image, filename: modelPhotoFilename)
+        UserDefaults.standard.set(modelPhotoFilename, forKey: modelPhotoKey)
+    }
+
+    func clearModelPhoto() {
+        let path = LocalImageView.resolvePath(modelPhotoFilename)
+        try? FileManager.default.removeItem(atPath: path)
+        UserDefaults.standard.removeObject(forKey: modelPhotoKey)
+    }
+
     func clearDeletedItems() {
         let items = PersistenceController.shared.fetchClothingItems(includeDeleted: true).filter { $0.isSoftDeleted }
         for item in items {
@@ -186,7 +300,7 @@ struct APIGuideView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("计费说明")
                         .font(.headline)
-                    Text("• 自动打标（Qwen-VL-Plus）：根据实际用量计费\n• 虚拟试穿（Qwen-Image）：根据实际用量计费\n• 新用户通常有免费额度可使用")
+                    Text("• 自动打标（qwen-vl-plus）：根据实际用量计费\n• 穿搭平铺图 / 虚拟试穿（wan2.6-image）：根据实际用量计费\n• 新用户通常有免费额度可使用")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 

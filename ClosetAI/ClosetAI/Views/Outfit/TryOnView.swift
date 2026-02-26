@@ -9,6 +9,7 @@ struct TryOnView: View {
     @State private var personImage: UIImage?
     @State private var showPhotoPicker = false
     @State private var collageImage: UIImage?
+    @State private var isGeneratingCollage = false
     @State private var sliderPosition: CGFloat = 0.5
     @State private var showSaveDialog = false
     @State private var outfitName = ""
@@ -57,7 +58,10 @@ struct TryOnView: View {
                 Button("取消", role: .cancel) {}
             }
             .onAppear {
-                generateCollage()
+                // 自动加载设置中保存的模特图
+                if personImage == nil, let filename = UserDefaults.standard.string(forKey: "closetai.modelPhotoFilename") {
+                    personImage = ImageProcessingService.shared.loadImage(from: filename)
+                }
             }
         }
         // sheet 放在 NavigationView 外面，避免嵌套问题
@@ -74,6 +78,7 @@ struct TryOnView: View {
     private var collageSection: some View {
         VStack(spacing: 12) {
             if let collage = collageImage {
+                // 已生成：展示图片
                 Image(uiImage: collage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -81,32 +86,71 @@ struct TryOnView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16)
                     .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
-            } else {
+
+                HStack(spacing: 12) {
+                    Button {
+                        UIImageWriteToSavedPhotosAlbum(collage, nil, nil, nil)
+                    } label: {
+                        Label("保存到相册", systemImage: "square.and.arrow.down")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(AppColors.accent)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    Button {
+                        collageImage = nil
+                        generateCollage()
+                    } label: {
+                        Label("重新生成", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color(.systemGray5))
+                            .foregroundColor(.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+                .padding(.horizontal, 16)
+
+            } else if isGeneratingCollage {
+                // 生成中：loading
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(.systemGray6))
                     .frame(maxWidth: .infinity)
                     .frame(height: 300)
                     .overlay(
                         VStack(spacing: 12) {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                            Text("AI 正在生成穿搭图...")
+                            ProgressView().scaleEffect(1.2)
+                            Text("AI 正在生成穿搭平铺图...")
                                 .foregroundColor(.secondary)
-                            Text("约 10-15 秒，请稍候")
+                            Text("约 8-10 秒，请稍候")
                                 .font(.caption)
                                 .foregroundColor(Color(.systemGray3))
                         }
                     )
                     .padding(.horizontal, 16)
-            }
+            } else {
+                // 未生成：确认按钮
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 200)
+                    .overlay(
+                        VStack(spacing: 16) {
+                            Image(systemName: "photo.stack")
+                                .font(.system(size: 40))
+                                .foregroundColor(Color(.systemGray3))
+                            Text("点击下方按钮生成穿搭平铺图")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    )
+                    .padding(.horizontal, 16)
 
-            if collageImage != nil {
                 Button {
-                    if let image = collageImage {
-                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-                    }
+                    generateCollage()
                 } label: {
-                    Label("保存到相册", systemImage: "square.and.arrow.down")
+                    Label("生成穿搭平铺图", systemImage: "sparkles")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(AppColors.accent)
@@ -128,7 +172,7 @@ struct TryOnView: View {
                     hangerAnimation
                     Text("AI 正在为您试穿...")
                         .foregroundColor(.secondary)
-                    Text("约 5–8 秒，请稍候")
+                    Text("约 8-10 秒，请稍候")
                         .font(.caption)
                         .foregroundColor(Color(.systemGray3))
                 }
@@ -157,19 +201,38 @@ struct TryOnView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .padding(.horizontal, 16)
+            } else if let person = personImage {
+                // 已有模特图：显示缩略预览，等待点击生成
+                VStack(spacing: 12) {
+                    Image(uiImage: person)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 260)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 16)
+                    Button {
+                        showPhotoPicker = true
+                    } label: {
+                        Label("更换模特图", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.subheadline)
+                            .foregroundColor(AppColors.accent)
+                    }
+                }
+                .padding(.vertical, 8)
             } else {
-                // Upload person photo prompt
+                // 无模特图：引导上传
                 VStack(spacing: 16) {
                     Image(systemName: "person.crop.rectangle.badge.plus")
                         .font(.system(size: 48))
                         .foregroundColor(Color(.systemGray3))
-
-                    Text("上传您的正面照片")
+                    Text("上传模特正面照片")
                         .font(.headline)
-                    Text("AI 将为您虚拟试穿这套搭配")
+                    Text("AI 将为模特虚拟试穿这套搭配\n也可在「设置」中保存常用模特图")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-
+                        .font(.subheadline)
                     Button {
                         showPhotoPicker = true
                     } label: {
@@ -259,8 +322,10 @@ struct TryOnView: View {
     // MARK: - Actions
 
     private func generateCollage() {
+        isGeneratingCollage = true
         Task {
             collageImage = await outfitVM.generateCollage(for: outfit)
+            isGeneratingCollage = false
         }
     }
 

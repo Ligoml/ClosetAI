@@ -141,37 +141,33 @@ class AliyunService: ObservableObject {
         return try JSONDecoder().decode(ClothingTags.self, from: jsonData)
     }
 
-    // MARK: - AI Collage Generation with qwen-image-edit-max
+    // MARK: - Wan2.6 Image Generation
+    // Endpoint: POST .../multimodal-generation/generation
+    // Docs: https://www.alibabacloud.com/help/en/model-studio/wan-image-generation-api-reference
 
-    /// Generate an outfit collage using qwen-image-edit-max (sync).
-    /// Endpoint: multimodal-generation/generation
-    /// Response: output.choices[0].message.content[0].image (URL string)
-    func generateAICollage(imageDatas: [Data], itemDescriptions: [String]) async throws -> Data {
+    private func callWan26Image(images: [Data], prompt: String, size: String = "1024*1024") async throws -> Data {
         let apiKey = dashscopeAPIKey
         guard !apiKey.isEmpty else { throw AliyunError.missingAPIKey }
-        guard !imageDatas.isEmpty else { throw AliyunError.apiError("No images provided") }
 
-        // Build content: one {"image": "data:..."} per clothing item, then text prompt
-        var content: [[String: Any]] = []
-        for imgData in imageDatas {
-            let base64 = imgData.base64EncodedString()
+        // Build content array: text prompt first, then reference images
+        var content: [[String: Any]] = [["text": prompt]]
+        for imageData in images.prefix(4) {
+            let base64 = imageData.base64EncodedString()
             content.append(["image": "data:image/jpeg;base64,\(base64)"])
         }
-        let itemDesc = itemDescriptions.isEmpty
-            ? "这些服装单品"
-            : itemDescriptions.joined(separator: "、")
-        content.append(["text": "请用以上\(imageDatas.count)件服装（\(itemDesc)）生成一张穿搭平铺展示图。要求：白色干净背景；按照人体穿着逻辑将衣物叠放组合，上装在上、下装在下、外套覆盖在上装外面、鞋子置于最下方；衣物之间自然重叠，模拟实际上身穿搭的视觉效果；整体平铺俯视视角，构图像时尚杂志的穿搭 flat lay 风格。"])
 
         let requestBody: [String: Any] = [
-            "model": "qwen-image-edit-max",
+            "model": "wan2.6-image",
             "input": [
                 "messages": [
                     ["role": "user", "content": content]
                 ]
             ],
             "parameters": [
-                "size": "1024*1024",
-                "watermark": false
+                "size": size,
+                "n": 1,
+                "watermark": false,
+                "prompt_extend": false
             ]
         ]
 
@@ -183,108 +179,61 @@ class AliyunService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 120  // sync call, allow up to 2 min
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        request.timeoutInterval = 120 // 图像生成最长约 60-90 秒
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 else {
             let body = String(data: data, encoding: .utf8) ?? "unknown"
-            throw AliyunError.apiError("Collage API error (\((response as? HTTPURLResponse)?.statusCode ?? -1)): \(body)")
+            throw AliyunError.apiError("生成失败 (\((response as? HTTPURLResponse)?.statusCode ?? -1)): \(body)")
         }
 
-        // Parse: output.choices[0].message.content[0].image
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        // Response: output.choices[0].message.content[*].image (URL)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let output = json["output"] as? [String: Any],
               let choices = output["choices"] as? [[String: Any]],
               let firstChoice = choices.first,
               let message = firstChoice["message"] as? [String: Any],
-              let contentArr = message["content"] as? [[String: Any]],
-              let firstItem = contentArr.first,
-              let imageURLStr = firstItem["image"] as? String,
-              let imageURL = URL(string: imageURLStr) else {
-            let body = String(data: data, encoding: .utf8) ?? "unknown"
-            throw AliyunError.apiError("Failed to parse collage response: \(body)")
+              let contentArray = message["content"] as? [[String: Any]] else {
+            let raw = String(data: data, encoding: .utf8) ?? ""
+            throw AliyunError.apiError("解析响应失败: \(raw.prefix(300))")
+        }
+
+        guard let imageContent = contentArray.first(where: { $0["image"] != nil }),
+              let imageURLString = imageContent["image"] as? String,
+              let imageURL = URL(string: imageURLString) else {
+            throw AliyunError.apiError("未找到生成的图片")
         }
 
         let (imgData, _) = try await URLSession.shared.data(from: imageURL)
         return imgData
     }
 
-    // MARK: - Virtual Try-On with qwen-vl-plus (image editing)
+    // MARK: - AI Collage Generation (wan2.6)
+
+    func generateAICollage(imageDatas: [Data], itemDescriptions: [String]) async throws -> Data {
+        guard !imageDatas.isEmpty else { throw AliyunError.apiError("No images provided") }
+        let itemDesc = itemDescriptions.isEmpty ? "这些服装单品" : itemDescriptions.joined(separator: "、")
+        let prompt = """
+        将以下\(imageDatas.count)件服装（\(itemDesc)）原样平铺排列成穿搭展示图。\
+        白色干净背景；上装在上、下装居中、外套覆盖上装外侧、鞋子置于最下方，衣物间自然叠放；\
+        每件衣物的长度、廓形、颜色、图案必须与原图完全一致，禁止改变形态或重新绘制；\
+        整体俯视平铺视角，时尚杂志 flat lay 风格构图。
+        """
+        return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
+    }
+
+    // MARK: - Virtual Try-On (wan2.6)
 
     func virtualTryOn(personImageData: Data, clothingItems: [Data]) async throws -> Data {
-        let apiKey = dashscopeAPIKey
-        guard !apiKey.isEmpty else {
-            throw AliyunError.missingAPIKey
-        }
-
-        let personBase64 = personImageData.base64EncodedString()
-        var content: [[String: Any]] = [
-            ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(personBase64)"]],
-            ["type": "text", "text": "这是需要试穿服装的人物图片。"]
-        ]
-
-        for clothData in clothingItems {
-            let clothBase64 = clothData.base64EncodedString()
-            content.append(["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(clothBase64)"]])
-        }
-
-        content.append(["type": "text", "text": """
-        请将图片中的服装自然地穿到人物身上，要求：
-        1. 保持人物姿势和面部特征不变
-        2. 服装自然垂感，贴合身形
-        3. 保持服装原有颜色和图案
-        4. 光线和阴影自然过渡
-        返回试穿效果图。
-        """])
-
-        let requestBody: [String: Any] = [
-            "model": "qwen-vl-plus",
-            "messages": [
-                ["role": "user", "content": content]
-            ],
-            "max_tokens": 1500
-        ]
-
-        guard let url = URL(string: dashscopeBaseURL) else {
-            throw AliyunError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        request.timeoutInterval = 60
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            let errorBody = String(data: data, encoding: .utf8) ?? "unknown"
-            throw AliyunError.apiError("HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1): \(errorBody)")
-        }
-
-        // Parse the image URL from response and download it
-        let dashResponse = try JSONDecoder().decode(DashScopeResponse.self, from: data)
-        guard let content = dashResponse.choices.first?.message.content else {
-            throw AliyunError.parseError
-        }
-
-        // If the response contains a URL, fetch it
-        if let imageURL = extractImageURL(from: content),
-           let url = URL(string: imageURL) {
-            let (imageData, _) = try await URLSession.shared.data(from: url)
-            return imageData
-        }
-
-        // If the response is base64
-        if let base64 = extractBase64(from: content),
-           let imageData = Data(base64Encoded: base64) {
-            return imageData
-        }
-
-        throw AliyunError.parseError
+        let allImages = [personImageData] + Array(clothingItems.prefix(3))
+        let prompt = """
+        你是一个 AI 试衣专家。第一张图是模特，后续图片是需要穿上的服装。\
+        请给模特穿上这些服装，同时保持人物姿态和衣服特征细节不变。\
+        要求：人物面部、发型、姿势完整保留；服装贴合身形，保持原有颜色、图案、款式、长度不变；\
+        光影自然过渡；输出完整全身试穿效果图。
+        """
+        return try await callWan26Image(images: Array(allImages), prompt: prompt, size: "768*1024")
     }
 
     // MARK: - Private Helpers
