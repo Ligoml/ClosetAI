@@ -93,6 +93,16 @@ class OutfitViewModel: ObservableObject {
         NotificationCenter.default.post(name: .closetAIOutfitsDidChange, object: nil)
     }
 
+    // MARK: - Update Outfit
+
+    func updateOutfit(_ outfit: Outfit, name: String, occasion: String) {
+        outfit.name = name
+        outfit.occasion = occasion
+        persistence.save()
+        loadSavedOutfits()
+        NotificationCenter.default.post(name: .closetAIOutfitsDidChange, object: nil)
+    }
+
     // MARK: - Delete Outfit
 
     func deleteOutfit(_ outfit: Outfit) {

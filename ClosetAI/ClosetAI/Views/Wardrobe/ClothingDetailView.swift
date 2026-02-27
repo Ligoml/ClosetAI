@@ -11,7 +11,8 @@ struct ClothingDetailView: View {
     @State private var editedTags: ClothingTags
     @State private var showRecordConfirm = false
     @State private var showRecordSuccess = false
-    @State private var selectedRelatedOutfit: OutfitSuggestion?
+    @State private var selectedRelatedOutfit: Outfit?
+    @State private var showAllRelatedOutfits = false
 
     init(item: ClothingItem) {
         self.item = item
@@ -58,9 +59,15 @@ struct ClothingDetailView: View {
                 }
             }
         }
-        .sheet(item: $selectedRelatedOutfit) { suggestion in
-            TryOnView(outfit: suggestion)
+        .sheet(item: $selectedRelatedOutfit) { outfit in
+            OutfitDetailView(outfit: outfit)
                 .environmentObject(outfitVM)
+                .environmentObject(viewModel)
+        }
+        .sheet(isPresented: $showAllRelatedOutfits) {
+            AllRelatedOutfitsSheet(relatedOutfits: viewModel.outfits(containing: item))
+                .environmentObject(outfitVM)
+                .environmentObject(viewModel)
         }
     }
 
@@ -275,18 +282,14 @@ struct ClothingDetailView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(related) { outfit in
+                        ForEach(related.prefix(5)) { outfit in
                             RelatedOutfitCard(outfit: outfit)
-                                .onTapGesture {
-                                    if let suggestion = makeOutfitSuggestion(from: outfit) {
-                                        selectedRelatedOutfit = suggestion
-                                    }
-                                }
+                                .onTapGesture { selectedRelatedOutfit = outfit }
                         }
 
                         if related.count > 5 {
                             Button {
-                                // Show all — for now just a placeholder (Phase B)
+                                showAllRelatedOutfits = true
                             } label: {
                                 VStack(spacing: 6) {
                                     Image(systemName: "ellipsis.circle")
@@ -307,16 +310,6 @@ struct ClothingDetailView: View {
         }
     }
 
-    private func makeOutfitSuggestion(from outfit: Outfit) -> OutfitSuggestion? {
-        let idStrings = (outfit.itemIDs ?? "").split(separator: ",").map { String($0) }
-        let items = viewModel.items.filter { item in
-            guard let id = item.id else { return false }
-            return idStrings.contains(id.uuidString)
-        }
-        guard !items.isEmpty else { return nil }
-        return OutfitSuggestion(items: items, score: 1.0)
-    }
-
     // MARK: - Notes Section
 
     private var notesSection: some View {
@@ -331,6 +324,47 @@ struct ClothingDetailView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM/dd"
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - All Related Outfits Sheet
+
+struct AllRelatedOutfitsSheet: View {
+    let relatedOutfits: [Outfit]
+    @EnvironmentObject var outfitVM: OutfitViewModel
+    @EnvironmentObject var wardrobeVM: WardrobeViewModel
+
+    @Environment(\.dismiss) var dismiss
+    @State private var selectedOutfit: Outfit?
+
+    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(relatedOutfits) { outfit in
+                        OutfitCollageCard(outfit: outfit)
+                            .frame(maxWidth: .infinity)
+                            .onTapGesture { selectedOutfit = outfit }
+                    }
+                }
+                .padding(16)
+            }
+            .background(Color(.systemGray6).ignoresSafeArea())
+            .navigationTitle("相关搭配（\(relatedOutfits.count)套）")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+        .sheet(item: $selectedOutfit) { outfit in
+            OutfitDetailView(outfit: outfit)
+                .environmentObject(outfitVM)
+                .environmentObject(wardrobeVM)
+        }
     }
 }
 
