@@ -213,14 +213,17 @@ class AliyunService: ObservableObject {
 
     func generateAICollage(imageDatas: [Data], itemDescriptions: [String]) async throws -> Data {
         guard !imageDatas.isEmpty else { throw AliyunError.apiError("No images provided") }
+        let n = imageDatas.count
         let numbered = itemDescriptions.enumerated().map { "第\($0.offset + 1)件：\($0.element)" }.joined(separator: "；")
-        let itemList = numbered.isEmpty ? "共 \(imageDatas.count) 件服装" : numbered
+        let itemList = numbered.isEmpty ? "共 \(n) 件服装" : numbered
         let prompt = """
-        严格只使用以下 \(imageDatas.count) 件参考服装（\(itemList)），不得添加、替换或凭空生成任何额外单品。\
-        将这 \(imageDatas.count) 件衣物原样平铺排列成一张穿搭 flat lay 展示图：\
-        纯白背景；上装居上、下装居中、外套叠于上装外侧、鞋包置最下方，各件自然错落；\
-        每件衣物的款式、长度、廓形、颜色、图案、细节必须与对应参考图完全一致，\
-        严禁改变任何形态、增减细节或重绘；整体俯视平铺，时尚杂志 flat lay 构图风格。
+        你是专业时尚 flat lay 摄影师。我提供了 \(n) 张参考服装图（\(itemList)）。\
+        请严格按以下规则生成一张穿搭平铺展示图：\
+        【数量】画面中必须包含且只包含这 \(n) 件衣物，每件恰好出现一次，不得遗漏任何一件，也不得重复出现同一件；\
+        【还原】每件衣物的颜色、图案、款式、长度、廓形必须与对应参考图完全一致，不得改变或重绘；\
+        【背景】纯白干净背景，整体俯视平铺（flat lay）视角；\
+        【布局】上装居上，下装居中，外套叠于上装外侧，鞋包置最下方，各件自然错落；\
+        【风格】时尚杂志 flat lay 构图，整洁美观。
         """
         return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
     }
@@ -235,7 +238,7 @@ class AliyunService: ObservableObject {
         要求：人物面部、发型、姿势完整保留；服装贴合身形，保持原有颜色、图案、款式、长度不变；\
         光影自然过渡；输出完整全身试穿效果图。
         """
-        return try await callWan26Image(images: Array(allImages), prompt: prompt, size: "768*1024")
+        return try await callWan26Image(images: Array(allImages), prompt: prompt, size: "768*1280")
     }
 
     // MARK: - Private Helpers

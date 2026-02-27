@@ -62,8 +62,10 @@ struct TryOnView: View {
             }
             .onAppear {
                 if personImage == nil,
-                   let filename = UserDefaults.standard.string(forKey: "closetai.modelPhotoFilename") {
-                    personImage = ImageProcessingService.shared.loadImage(from: filename)
+                   let filename = UserDefaults.standard.string(forKey: "closetai.modelPhotoFilename"),
+                   let raw = ImageProcessingService.shared.loadImage(from: filename) {
+                    // 直接裁剪到 768×1280，与生成图尺寸一致
+                    personImage = centerCrop(raw, to: CGSize(width: 768, height: 1280))
                 }
             }
             // 试穿结果到来时，一次性归一化两张图
@@ -82,7 +84,14 @@ struct TryOnView: View {
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPickerView(images: Binding(
                 get: { personImage.map { [$0] } ?? [] },
-                set: { personImage = $0.first }
+                set: { imgs in
+                    // 选图后立即裁剪到 768×1280，与 virtualTryOn 生成尺寸一致
+                    if let raw = imgs.first {
+                        personImage = centerCrop(raw, to: CGSize(width: 768, height: 1280))
+                    } else {
+                        personImage = nil
+                    }
+                }
             ))
         }
     }
@@ -379,17 +388,10 @@ struct TryOnView: View {
         dismiss()
     }
 
-    /// 把两张图居中裁剪到相同的 3:4 固定尺寸，保证 ComparisonSlider 完全对齐
+    /// 对比图：personImage 已在上传时裁为 768×1280，result 也是 768×1280，直接赋值即可
     private func buildComparisonImages(person: UIImage, result: UIImage) {
-        let targetSize = CGSize(width: 480, height: 640) // 固定 3:4，与 frame(height:420) 匹配
-        DispatchQueue.global(qos: .userInitiated).async {
-            let before = centerCrop(person, to: targetSize)
-            let after  = centerCrop(result,  to: targetSize)
-            DispatchQueue.main.async {
-                comparisonBefore = before
-                comparisonAfter  = after
-            }
-        }
+        comparisonBefore = person
+        comparisonAfter  = result
     }
 }
 
