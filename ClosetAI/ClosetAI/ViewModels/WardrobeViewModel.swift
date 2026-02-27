@@ -101,6 +101,15 @@ class WardrobeViewModel: ObservableObject {
     var totalCount: Int { items.filter { !$0.isSoftDeleted }.count }
     var idleCount: Int { idleItemIDs.count }
 
+    var notWornRecently: [ClothingItem] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: Date()) ?? Date()
+        return items.filter { item in
+            guard !item.isSoftDeleted else { return false }
+            guard let lastWorn = item.lastWornDate else { return true }
+            return lastWorn < cutoff
+        }
+    }
+
     var colorDistribution: [String: Int] {
         var dist: [String: Int] = [:]
         for item in items where !item.isSoftDeleted {

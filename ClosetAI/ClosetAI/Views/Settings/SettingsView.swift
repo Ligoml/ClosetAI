@@ -152,13 +152,13 @@ struct SettingsView: View {
         }
     }
 
-    private var statisticsSection: some View {
+    @ViewBuilder private var statisticsSection: some View {
         Section {
-            HStack {
-                Label("衣物总数", systemImage: "tshirt")
-                Spacer()
+            LabeledContent {
                 Text("\(wardrobeVM.totalCount) 件")
                     .foregroundColor(.secondary)
+            } label: {
+                Label("衣物总数", systemImage: "tshirt")
             }
 
             NavigationLink(destination: ColorDistributionView(distribution: wardrobeVM.colorDistribution)) {
@@ -166,11 +166,11 @@ struct SettingsView: View {
             }
 
             NavigationLink(destination: NotWornRecentlyView(items: wardrobeVM.notWornRecently)) {
-                HStack {
-                    Label("近90天未穿", systemImage: "clock")
-                    Spacer()
+                LabeledContent {
                     Text("\(wardrobeVM.notWornRecently.count) 件")
                         .foregroundColor(wardrobeVM.notWornRecently.count > 5 ? .orange : .secondary)
+                } label: {
+                    Label("近90天未穿", systemImage: "clock")
                 }
             }
         } header: {
@@ -198,20 +198,20 @@ struct SettingsView: View {
         }
     }
 
-    private var infoSection: some View {
+    @ViewBuilder private var infoSection: some View {
         Section {
-            HStack {
-                Label("版本", systemImage: "info.circle")
-                Spacer()
+            LabeledContent {
                 Text("1.0.0")
                     .foregroundColor(.secondary)
+            } label: {
+                Label("版本", systemImage: "info.circle")
             }
 
-            HStack {
-                Label("平台", systemImage: "iphone")
-                Spacer()
+            LabeledContent {
                 Text("iOS 16+")
                     .foregroundColor(.secondary)
+            } label: {
+                Label("平台", systemImage: "iphone")
             }
         } header: {
             Text("关于")
