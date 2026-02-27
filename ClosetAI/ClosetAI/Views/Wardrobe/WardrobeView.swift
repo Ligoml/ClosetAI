@@ -35,30 +35,38 @@ struct WardrobeView: View {
     @State private var showDeletedItems = false
     @State private var showAllSectionTitle: String? = nil
     @State private var showAllSectionItems: [ClothingItem] = []
+    @State private var showSearch = false
 
     var body: some View {
         NavigationView {
             ZStack {
                 Color(.systemGray6).ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Stats bar
-                        if viewModel.searchText.isEmpty {
-                            statsBar
-                                .padding(.horizontal, 16)
-                                .padding(.top, 8)
-                                .padding(.bottom, 4)
-                        }
-
-                        // Content: search results or section layout
-                        if viewModel.searchText.isEmpty {
-                            sectionLayout
-                        } else {
-                            searchContent
-                        }
+                VStack(spacing: 0) {
+                    // 搜索栏（按需呼出）
+                    if showSearch {
+                        searchBar
                     }
-                    .padding(.bottom, 100) // Space for FAB
+
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Stats bar
+                            if viewModel.searchText.isEmpty {
+                                statsBar
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 8)
+                                    .padding(.bottom, 4)
+                            }
+
+                            // Content: search results or section layout
+                            if viewModel.searchText.isEmpty {
+                                sectionLayout
+                            } else {
+                                searchContent
+                            }
+                        }
+                        .padding(.bottom, 100) // Space for FAB
+                    }
                 }
 
                 // Loading toast
@@ -74,11 +82,13 @@ struct WardrobeView: View {
                 }
             }
             .navigationTitle("衣橱")
-            .navigationBarTitleDisplayMode(.large)
-            .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "搜索颜色、风格、类别...")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     trashButton
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    searchButton
                 }
             }
             .onChange(of: selectedImage) { image in
@@ -134,14 +144,14 @@ struct WardrobeView: View {
     // MARK: - Stats Bar
 
     private var statsBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Text("共 \(viewModel.totalCount) 件")
-                .font(.system(size: 14))
+                .font(.system(size: 12))
                 .foregroundColor(.secondary)
             Text("·")
+                .font(.system(size: 12))
                 .foregroundColor(.secondary)
             Button {
-                // Show all idle items
                 let idleItems = viewModel.items.filter {
                     !$0.isSoftDeleted && viewModel.idleItemIDs.contains($0.id ?? UUID())
                 }
@@ -149,7 +159,7 @@ struct WardrobeView: View {
                 showAllSectionTitle = "未搭配"
             } label: {
                 Text("未搭配 \(viewModel.idleCount) 件")
-                    .font(.system(size: 14))
+                    .font(.system(size: 12))
                     .foregroundColor(viewModel.idleCount > 0 ? AppColors.idle : .secondary)
             }
             .disabled(viewModel.idleCount == 0)
@@ -186,26 +196,26 @@ struct WardrobeView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Section header
             HStack {
-                Text("\(name) · \(items.count)件")
-                    .font(.system(size: 17, weight: .semibold))
+                Text("\(name)  \(items.count)")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
                 Button {
                     showAllSectionItems = items
                     showAllSectionTitle = name
                 } label: {
-                    Text("查看全部")
+                    Image(systemName: "list.bullet")
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 10)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
 
             // Horizontal scroll
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 10) {
+                LazyHStack(spacing: 8) {
                     ForEach(items) { item in
                         ClothingItemCard(
                             item: item,
@@ -222,12 +232,12 @@ struct WardrobeView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+                .padding(.bottom, 12)
             }
         }
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
     }
 
     // MARK: - Search Results
@@ -333,7 +343,47 @@ struct WardrobeView: View {
         )
     }
 
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+            TextField("搜索颜色、风格、类别...", text: $viewModel.searchText)
+                .font(.system(size: 14))
+            if !viewModel.searchText.isEmpty {
+                Button { viewModel.searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color(.systemGray3))
+                }
+            }
+            Button("取消") {
+                viewModel.searchText = ""
+                showSearch = false
+            }
+            .font(.system(size: 14))
+            .foregroundColor(AppColors.accent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(.systemBackground))
+    }
+
     // MARK: - Toolbar Buttons
+
+    private var searchButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showSearch.toggle()
+                if !showSearch { viewModel.searchText = "" }
+            }
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+        }
+    }
 
     private var trashButton: some View {
         Button { showDeletedItems = true } label: {

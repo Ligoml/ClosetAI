@@ -47,7 +47,7 @@ struct LocalImageView: View {
     }
 }
 
-// MARK: - Clothing Item Card (v2.0: 140×170, white card, idle badge)
+// MARK: - Clothing Item Card (v2.0: 120×120, image-only, idle badge)
 
 struct ClothingItemCard: View {
     let item: ClothingItem
@@ -55,43 +55,20 @@ struct ClothingItemCard: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            VStack(spacing: 0) {
-                LocalImageView(path: item.flatLayImagePath ?? item.originalImagePath)
-                    .frame(width: 140, height: 140)
-                    .clipped()
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.subCategory ?? item.category ?? "")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    let colors = (item.colors as? [String]) ?? []
-                    if !colors.isEmpty {
-                        Text(colors.prefix(2).joined(separator: " · "))
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(height: 30, alignment: .top)
-            }
-            .frame(width: 140, height: 170)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 1)
+            LocalImageView(path: item.flatLayImagePath ?? item.originalImagePath)
+                .frame(width: 120, height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
 
             if isIdle {
                 Text("未搭配")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
                     .background(AppColors.idle)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .padding(6)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .padding(5)
             }
         }
     }

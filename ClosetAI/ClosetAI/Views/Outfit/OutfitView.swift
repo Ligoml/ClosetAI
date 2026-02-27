@@ -27,7 +27,7 @@ struct OutfitView: View {
                 }
             }
             .navigationTitle("穿搭")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear { outfitVM.loadSavedOutfits() }
         }
         // FAB overlay
@@ -69,25 +69,25 @@ struct OutfitView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Section header
             HStack {
-                Text("\(occasion) · \(outfits.count)套")
-                    .font(.system(size: 17, weight: .semibold))
+                Text("\(occasion)  \(outfits.count)")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
                 Button {
                     showAllOccasion = occasion
                 } label: {
-                    Text("查看全部")
+                    Image(systemName: "list.bullet")
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 10)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
 
             // Horizontal scroll of outfit cards
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 10) {
+                LazyHStack(spacing: 8) {
                     ForEach(outfits) { outfit in
                         OutfitCollageCard(outfit: outfit)
                             .onTapGesture { selectedOutfit = outfit }
@@ -101,12 +101,12 @@ struct OutfitView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+                .padding(.bottom, 12)
             }
         }
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
     }
 
     // MARK: - Empty State
@@ -145,38 +145,30 @@ struct OutfitView: View {
     }
 }
 
-// MARK: - Outfit Collage Card (160×200)
+// MARK: - Outfit Collage Card (140×160, image-only)
 
 struct OutfitCollageCard: View {
     let outfit: Outfit
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        ZStack(alignment: .bottomLeading) {
             LocalImageView(path: outfit.collagePath)
-                .frame(width: 160, height: 158)
+                .frame(width: 140, height: 160)
                 .clipped()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(outfit.name ?? "未命名")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-
-                Text(outfit.occasion ?? "")
+            if let name = outfit.name, !name.isEmpty {
+                Text(name)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white)
+                    .lineLimit(1)
                     .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(AppColors.accent.opacity(0.85))
-                    .clipShape(Capsule())
+                    .padding(.vertical, 3)
+                    .background(Color.black.opacity(0.35))
+                    .padding(6)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
         }
-        .frame(width: 160, height: 200)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .frame(width: 140, height: 160)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 1)
     }
 }
