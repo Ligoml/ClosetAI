@@ -9,8 +9,6 @@ struct ClothingDetailView: View {
     @State private var showOriginal = false
     @State private var isEditing = false
     @State private var editedTags: ClothingTags
-    @State private var showRecordConfirm = false
-    @State private var showRecordSuccess = false
     @State private var selectedRelatedOutfit: Outfit?
     @State private var showAllRelatedOutfits = false
 
@@ -116,48 +114,18 @@ struct ClothingDetailView: View {
     // MARK: - Stats Section
 
     private var statsSection: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 0) {
-                statItem(value: "\(item.wearCount)", label: "穿着次数")
-                Divider().frame(height: 40)
-                statItem(value: item.lastWornDate.map { formatDate($0) } ?? "从未", label: "上次穿着")
-                Divider().frame(height: 40)
-                statItem(value: formatDate(item.createdAt ?? Date()), label: "入橱时间")
-            }
-
-            Button {
-                showRecordConfirm = true
-            } label: {
-                Label("记录今天穿了这件", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(AppColors.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .padding(.horizontal, 4)
+        HStack(spacing: 0) {
+            statItem(value: "\(viewModel.outfits(containing: item).count)", label: "搭配数")
+            Divider().frame(height: 40)
+            statItem(value: item.lastWornDate.map { formatDate($0) } ?? "从未", label: "上次穿着")
+            Divider().frame(height: 40)
+            statItem(value: formatDate(item.createdAt ?? Date()), label: "入橱时间")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
-        .alert("记录穿着", isPresented: $showRecordConfirm) {
-            Button("确认记录") {
-                viewModel.recordWear(for: item)
-                showRecordSuccess = true
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("将今天的穿着记录下来？\n当前已穿 \(item.wearCount) 次")
-        }
-        .alert("记录成功", isPresented: $showRecordSuccess) {
-            Button("好的") {}
-        } message: {
-            Text("穿着记录已更新 ✓")
-        }
     }
 
     private func statItem(value: String, label: String) -> some View {
@@ -267,7 +235,7 @@ struct ClothingDetailView: View {
     private var relatedOutfitsSection: some View {
         let related = viewModel.outfits(containing: item)
         return VStack(alignment: .leading, spacing: 12) {
-            Text("出现在哪些搭配中")
+            Text("搭配记录")
                 .font(.headline)
                 .padding(.horizontal, 16)
 

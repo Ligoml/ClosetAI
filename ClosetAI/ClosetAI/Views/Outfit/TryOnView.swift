@@ -11,6 +11,7 @@ struct TryOnView: View {
     @State private var collageImage: UIImage?
     @State private var isGeneratingCollage = false
     @State private var showSaveSheet = false
+    @State private var showNoCollageAlert = false
     @State private var outfitName = ""
     @State private var saveOccasion: String = Occasion.allCases.first?.rawValue ?? "日常"
     @State private var activeTab = 0 // 0: collage, 1: try-on
@@ -52,8 +53,14 @@ struct TryOnView: View {
                     Button("关闭") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("保存") { showSaveSheet = true }
-                        .foregroundColor(AppColors.accent)
+                    Button("保存") {
+                        if collageImage == nil {
+                            showNoCollageAlert = true
+                        } else {
+                            showSaveSheet = true
+                        }
+                    }
+                    .foregroundColor(AppColors.accent)
                 }
             }
             .onAppear {
@@ -72,6 +79,11 @@ struct TryOnView: View {
                 outfitVM.tryOnResultImage = nil
                 comparisonBefore = nil
                 comparisonAfter = nil
+            }
+            .alert("需要先生成拼接图", isPresented: $showNoCollageAlert) {
+                Button("好的") {}
+            } message: {
+                Text("请先在「拼接效果图」页面生成穿搭图，再保存")
             }
         }
         .sheet(isPresented: $showPhotoPicker) {

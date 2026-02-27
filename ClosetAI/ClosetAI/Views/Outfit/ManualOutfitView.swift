@@ -9,7 +9,6 @@ struct ManualOutfitView: View {
     @State private var selectedIDs: Set<UUID> = []
     @State private var filterCategory: String = "全部"
     @State private var createdOutfit: OutfitSuggestion?
-    @State private var showTryOn = false
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
@@ -63,11 +62,9 @@ struct ManualOutfitView: View {
             }
         }
         // sheet 放在 NavigationView 外面，避免嵌套冲突
-        .sheet(isPresented: $showTryOn) {
-            if let outfit = createdOutfit {
-                TryOnView(outfit: outfit)
-                    .environmentObject(outfitVM)
-            }
+        .sheet(item: $createdOutfit) { outfit in
+            TryOnView(outfit: outfit)
+                .environmentObject(outfitVM)
         }
     }
 
@@ -161,7 +158,6 @@ struct ManualOutfitView: View {
         }
         // 构造 OutfitSuggestion，score=1 表示用户手动选择
         createdOutfit = OutfitSuggestion(items: sorted, score: 1.0)
-        showTryOn = true
     }
 }
 

@@ -32,8 +32,6 @@ struct WardrobeView: View {
     @State private var showPhotoPicker = false
     @State private var selectedImage: UIImage?
     @State private var selectedItem: ClothingItem?
-    @State private var itemToRecord: ClothingItem?
-    @State private var showRecordSuccess = false
     @State private var showDeletedItems = false
     @State private var showAllSectionTitle: String? = nil
     @State private var showAllSectionItems: [ClothingItem] = []
@@ -79,9 +77,6 @@ struct WardrobeView: View {
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "搜索颜色、风格、类别...")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    addButton
-                }
                 ToolbarItem(placement: .navigationBarLeading) {
                     trashButton
                 }
@@ -98,25 +93,6 @@ struct WardrobeView: View {
                 Button("确定") { viewModel.errorMessage = nil }
             } message: {
                 Text(viewModel.errorMessage ?? "")
-            }
-            .alert("记录穿着", isPresented: Binding(
-                get: { itemToRecord != nil },
-                set: { if !$0 { itemToRecord = nil } }
-            )) {
-                Button("确认") {
-                    if let item = itemToRecord { viewModel.recordWear(for: item); showRecordSuccess = true }
-                    itemToRecord = nil
-                }
-                Button("取消", role: .cancel) { itemToRecord = nil }
-            } message: {
-                if let item = itemToRecord {
-                    Text("将「\(item.subCategory ?? item.category ?? "此衣物")」今天的穿着记录下来？\n当前已穿 \(item.wearCount) 次")
-                } else { Text("") }
-            }
-            .alert("已记录", isPresented: $showRecordSuccess) {
-                Button("好的") {}
-            } message: {
-                Text("穿着记录已更新，穿着次数 +1")
             }
         }
         // FAB overlay (outside NavigationView for proper layering)
@@ -210,7 +186,7 @@ struct WardrobeView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Section header
             HStack {
-                Text("\(name)  \(items.count)件")
+                Text("\(name) · \(items.count)件")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
@@ -237,11 +213,6 @@ struct WardrobeView: View {
                         )
                         .onTapGesture { selectedItem = item }
                         .contextMenu {
-                            Button {
-                                itemToRecord = item
-                            } label: {
-                                Label("记录穿着", systemImage: "checkmark.circle")
-                            }
                             Button(role: .destructive) {
                                 viewModel.softDelete(item)
                             } label: {
@@ -287,9 +258,6 @@ struct WardrobeView: View {
                         .frame(maxWidth: .infinity)
                         .onTapGesture { selectedItem = item }
                         .contextMenu {
-                            Button { itemToRecord = item } label: {
-                                Label("记录穿着", systemImage: "checkmark.circle")
-                            }
                             Button(role: .destructive) {
                                 viewModel.softDelete(item)
                             } label: {
@@ -338,7 +306,7 @@ struct WardrobeView: View {
                 .frame(width: 56, height: 56)
                 .background(AppColors.accent)
                 .clipShape(Circle())
-                .shadow(color: AppColors.accent.opacity(0.4), radius: 8, x: 0, y: 4)
+                .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 4)
         }
         .padding(.trailing, 24)
         .padding(.bottom, 32)
@@ -366,21 +334,6 @@ struct WardrobeView: View {
     }
 
     // MARK: - Toolbar Buttons
-
-    private var addButton: some View {
-        Menu {
-            Button { showCamera = true } label: {
-                Label("拍照", systemImage: "camera")
-            }
-            Button { showPhotoPicker = true } label: {
-                Label("从相册选择", systemImage: "photo.on.rectangle")
-            }
-        } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.title2)
-                .foregroundColor(AppColors.accent)
-        }
-    }
 
     private var trashButton: some View {
         Button { showDeletedItems = true } label: {
