@@ -11,10 +11,11 @@ struct ContentView: View {
                     Label("衣橱", systemImage: "tshirt")
                 }
                 .environmentObject(wardrobeVM)
+                .environmentObject(outfitVM)
 
             OutfitView()
                 .tabItem {
-                    Label("穿搭", systemImage: "sparkles")
+                    Label("穿搭", systemImage: "rectangle.stack.person.crop")
                 }
                 .environmentObject(outfitVM)
                 .environmentObject(wardrobeVM)

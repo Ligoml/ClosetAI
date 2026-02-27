@@ -10,8 +10,9 @@ struct TryOnView: View {
     @State private var showPhotoPicker = false
     @State private var collageImage: UIImage?
     @State private var isGeneratingCollage = false
-    @State private var showSaveDialog = false
+    @State private var showSaveSheet = false
     @State private var outfitName = ""
+    @State private var saveOccasion: String = Occasion.allCases.first?.rawValue ?? "日常"
     @State private var activeTab = 0 // 0: collage, 1: try-on
 
     // 预处理后的对比图（固定 3:4 尺寸，保证对齐）
@@ -51,30 +52,22 @@ struct TryOnView: View {
                     Button("关闭") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("保存") { showSaveDialog = true }
+                    Button("保存") { showSaveSheet = true }
                         .foregroundColor(AppColors.accent)
                 }
-            }
-            .alert("保存穿搭", isPresented: $showSaveDialog) {
-                TextField("穿搭名称", text: $outfitName)
-                Button("保存") { saveOutfit() }
-                Button("取消", role: .cancel) {}
             }
             .onAppear {
                 if personImage == nil,
                    let filename = UserDefaults.standard.string(forKey: "closetai.modelPhotoFilename"),
                    let raw = ImageProcessingService.shared.loadImage(from: filename) {
-                    // 直接裁剪到 768×1280，与生成图尺寸一致
                     personImage = centerCrop(raw, to: CGSize(width: 768, height: 1280))
                 }
             }
-            // 试穿结果到来时，一次性归一化两张图
             .onChange(of: outfitVM.tryOnResultImage) { result in
                 if let result = result, let person = personImage {
                     buildComparisonImages(person: person, result: result)
                 }
             }
-            // 切换模特图时清空旧对比图
             .onChange(of: personImage) { _ in
                 outfitVM.tryOnResultImage = nil
                 comparisonBefore = nil
@@ -85,7 +78,6 @@ struct TryOnView: View {
             PhotoPickerView(images: Binding(
                 get: { personImage.map { [$0] } ?? [] },
                 set: { imgs in
-                    // 选图后立即裁剪到 768×1280，与 virtualTryOn 生成尺寸一致
                     if let raw = imgs.first {
                         personImage = centerCrop(raw, to: CGSize(width: 768, height: 1280))
                     } else {
@@ -93,6 +85,16 @@ struct TryOnView: View {
                     }
                 }
             ))
+        }
+        .sheet(isPresented: $showSaveSheet) {
+            SaveOutfitSheet(
+                outfitName: $outfitName,
+                selectedOccasion: $saveOccasion,
+                occasions: outfitVM.occasions,
+                onSave: { saveOutfit(); showSaveSheet = false },
+                onCancel: { showSaveSheet = false }
+            )
+            .presentationDetents([.medium])
         }
     }
 
@@ -109,9 +111,7 @@ struct TryOnView: View {
 
     private func tabButton(title: String, index: Int) -> some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                activeTab = index
-            }
+            withAnimation(.easeInOut(duration: 0.15)) { activeTab = index }
         } label: {
             Text(title)
                 .font(.subheadline)
@@ -121,7 +121,7 @@ struct TryOnView: View {
                 .background(activeTab == index ? AppColors.accent : Color(.systemGray6))
                 .foregroundColor(activeTab == index ? .white : .primary)
         }
-        .buttonStyle(.plain) // 防止 ScrollView 内 Button 的高亮延迟
+        .buttonStyle(.plain)
     }
 
     // MARK: - Collage Section
@@ -229,10 +229,9 @@ struct TryOnView: View {
                 .padding(.horizontal, 16)
 
             } else if let before = comparisonBefore, let after = comparisonAfter {
-                // 两张图已归一化，直接传入 ComparisonSlider
                 ComparisonSlider(beforeImage: before, afterImage: after)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 420)
+                    .aspectRatio(768.0 / 1280.0, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16)
 
@@ -255,10 +254,8 @@ struct TryOnView: View {
                 VStack(spacing: 12) {
                     Image(uiImage: person)
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 260)
-                        .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal, 16)
                     Button {
@@ -377,21 +374,63 @@ struct TryOnView: View {
     }
 
     private func saveOutfit() {
-        let name = outfitName.isEmpty
-            ? "穿搭 \(Date().formatted(date: .abbreviated, time: .omitted))"
-            : outfitName
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM月"
+        let month = formatter.string(from: Date())
+        let name = outfitName.isEmpty ? "\(month) \(saveOccasion)" : outfitName
+
         if let collage = collageImage,
            let path = ImageProcessingService.shared.saveImageToDocuments(
                collage, filename: "\(outfit.id.uuidString)_collage.jpg") {
-            outfitVM.saveOutfit(outfit, collagePath: path, name: name)
+            outfitVM.saveOutfit(outfit, collagePath: path, name: name, occasion: saveOccasion)
         }
         dismiss()
     }
 
-    /// 对比图：personImage 已在上传时裁为 768×1280，result 也是 768×1280，直接赋值即可
     private func buildComparisonImages(person: UIImage, result: UIImage) {
         comparisonBefore = person
         comparisonAfter  = result
+    }
+}
+
+// MARK: - Save Outfit Sheet
+
+struct SaveOutfitSheet: View {
+    @Binding var outfitName: String
+    @Binding var selectedOccasion: String
+    let occasions: [String]
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("穿搭名称（可选）") {
+                    TextField("默认按「月份 + 场合」命名", text: $outfitName)
+                }
+                Section("场合") {
+                    Picker("场合", selection: $selectedOccasion) {
+                        ForEach(occasions, id: \.self) { occasion in
+                            Text(occasion).tag(occasion)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                }
+            }
+            .navigationTitle("保存穿搭")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") { onCancel() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("保存") { onSave() }
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColors.accent)
+                }
+            }
+        }
     }
 }
 
@@ -415,7 +454,7 @@ private func centerCrop(_ image: UIImage, to targetSize: CGSize) -> UIImage {
 // MARK: - Comparison Slider
 
 struct ComparisonSlider: View {
-    let beforeImage: UIImage  // 已经过 centerCrop，与 afterImage 同尺寸
+    let beforeImage: UIImage
     let afterImage: UIImage
 
     @State private var sliderOffset: CGFloat = 0.5
@@ -423,14 +462,12 @@ struct ComparisonSlider: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                // After image（试穿结果，全显）
                 Image(uiImage: afterImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
 
-                // Before image（原图，左侧裁剪显示）
                 Image(uiImage: beforeImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -442,13 +479,11 @@ struct ComparisonSlider: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     )
 
-                // 分割线
                 Rectangle()
                     .fill(Color.white)
                     .frame(width: 2)
                     .offset(x: geo.size.width * sliderOffset - 1)
 
-                // 拖拽手柄
                 Circle()
                     .fill(Color.white)
                     .frame(width: 36, height: 36)
@@ -464,7 +499,6 @@ struct ComparisonSlider: View {
                     .shadow(radius: 4)
                     .offset(x: geo.size.width * sliderOffset - 18)
 
-                // 标签
                 VStack {
                     HStack {
                         Text("原图")

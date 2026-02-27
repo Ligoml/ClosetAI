@@ -3,6 +3,7 @@ import SwiftUI
 struct ClothingDetailView: View {
     let item: ClothingItem
     @EnvironmentObject var viewModel: WardrobeViewModel
+    @EnvironmentObject var outfitVM: OutfitViewModel
     @Environment(\.dismiss) var dismiss
 
     @State private var showOriginal = false
@@ -10,6 +11,7 @@ struct ClothingDetailView: View {
     @State private var editedTags: ClothingTags
     @State private var showRecordConfirm = false
     @State private var showRecordSuccess = false
+    @State private var selectedRelatedOutfit: OutfitSuggestion?
 
     init(item: ClothingItem) {
         self.item = item
@@ -29,17 +31,14 @@ struct ClothingDetailView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Image carousel (original <-> flat lay)
                     imageSection
-
-                    // Stats
                     statsSection
-
-                    // Tags
                     tagsSection
 
-                    // Notes
-                    if !editedTags.notes.isEmpty {
+                    // Related outfits (v2.0 new feature)
+                    relatedOutfitsSection
+
+                    if !editedTags.notes.isEmpty && !isEditing {
                         notesSection
                     }
                 }
@@ -52,16 +51,20 @@ struct ClothingDetailView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(isEditing ? "保存" : "编辑") {
-                        if isEditing {
-                            viewModel.updateItem(item, tags: editedTags)
-                        }
+                        if isEditing { viewModel.updateItem(item, tags: editedTags) }
                         isEditing.toggle()
                     }
                     .foregroundColor(AppColors.accent)
                 }
             }
         }
+        .sheet(item: $selectedRelatedOutfit) { suggestion in
+            TryOnView(outfit: suggestion)
+                .environmentObject(outfitVM)
+        }
     }
+
+    // MARK: - Image Section
 
     private var imageSection: some View {
         VStack {
@@ -81,15 +84,12 @@ struct ClothingDetailView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: showOriginal)
-            .gesture(DragGesture()
-                .onEnded { value in
-                    if abs(value.translation.width) > 50 {
-                        withAnimation { showOriginal.toggle() }
-                    }
+            .gesture(DragGesture().onEnded { value in
+                if abs(value.translation.width) > 50 {
+                    withAnimation { showOriginal.toggle() }
                 }
-            )
+            })
 
-            // Page indicator
             HStack(spacing: 8) {
                 Circle()
                     .fill(showOriginal ? Color(.systemGray4) : AppColors.accent)
@@ -106,6 +106,8 @@ struct ClothingDetailView: View {
         }
     }
 
+    // MARK: - Stats Section
+
     private var statsSection: some View {
         VStack(spacing: 12) {
             HStack(spacing: 0) {
@@ -116,7 +118,6 @@ struct ClothingDetailView: View {
                 statItem(value: formatDate(item.createdAt ?? Date()), label: "入橱时间")
             }
 
-            // 记录穿着按钮
             Button {
                 showRecordConfirm = true
             } label: {
@@ -154,15 +155,13 @@ struct ClothingDetailView: View {
 
     private func statItem(value: String, label: String) -> some View {
         VStack(spacing: 4) {
-            Text(value)
-                .font(.headline)
-                .fontWeight(.semibold)
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Text(value).font(.headline).fontWeight(.semibold)
+            Text(label).font(.caption).foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
+
+    // MARK: - Tags Section
 
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -180,27 +179,13 @@ struct ClothingDetailView: View {
 
     private var readonlyTags: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !editedTags.category.isEmpty {
-                tagRow(label: "大类", value: editedTags.category)
-            }
-            if !editedTags.subCategory.isEmpty {
-                tagRow(label: "小类", value: editedTags.subCategory)
-            }
-            if !editedTags.colors.isEmpty {
-                tagRow(label: "颜色", tags: editedTags.colors)
-            }
-            if !editedTags.pattern.isEmpty {
-                tagRow(label: "图案", value: editedTags.pattern)
-            }
-            if !editedTags.styles.isEmpty {
-                tagRow(label: "风格", tags: editedTags.styles)
-            }
-            if !editedTags.seasons.isEmpty {
-                tagRow(label: "季节", tags: editedTags.seasons)
-            }
-            if !editedTags.occasions.isEmpty {
-                tagRow(label: "场合", tags: editedTags.occasions)
-            }
+            if !editedTags.category.isEmpty { tagRow(label: "大类", value: editedTags.category) }
+            if !editedTags.subCategory.isEmpty { tagRow(label: "小类", value: editedTags.subCategory) }
+            if !editedTags.colors.isEmpty { tagRow(label: "颜色", tags: editedTags.colors) }
+            if !editedTags.pattern.isEmpty { tagRow(label: "图案", value: editedTags.pattern) }
+            if !editedTags.styles.isEmpty { tagRow(label: "风格", tags: editedTags.styles) }
+            if !editedTags.seasons.isEmpty { tagRow(label: "季节", tags: editedTags.seasons) }
+            if !editedTags.occasions.isEmpty { tagRow(label: "场合", tags: editedTags.occasions) }
         }
         .padding(.horizontal, 16)
     }
@@ -211,8 +196,7 @@ struct ClothingDetailView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .frame(width: 48, alignment: .leading)
-            Text(value)
-                .font(.subheadline)
+            Text(value).font(.subheadline)
         }
     }
 
@@ -232,8 +216,6 @@ struct ClothingDetailView: View {
             editField(label: "小类", text: $editedTags.subCategory)
             editField(label: "图案", text: $editedTags.pattern)
             editField(label: "备注", text: $editedTags.notes)
-
-            // Multi-select for styles, seasons, occasions
             multiSelectRow(label: "季节", selected: $editedTags.seasons, options: Season.allCases.map { $0.rawValue })
             multiSelectRow(label: "场合", selected: $editedTags.occasions, options: Occasion.allCases.map { $0.rawValue })
         }
@@ -242,19 +224,14 @@ struct ClothingDetailView: View {
 
     private func editField(label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            TextField(label, text: text)
-                .textFieldStyle(.roundedBorder)
+            Text(label).font(.caption).foregroundColor(.secondary)
+            TextField(label, text: text).textFieldStyle(.roundedBorder)
         }
     }
 
     private func multiSelectRow(label: String, selected: Binding<[String]>, options: [String]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Text(label).font(.caption).foregroundColor(.secondary)
             FlowLayout(spacing: 8) {
                 ForEach(options, id: \.self) { option in
                     let isSelected = selected.wrappedValue.contains(option)
@@ -278,13 +255,74 @@ struct ClothingDetailView: View {
         }
     }
 
+    // MARK: - Related Outfits Section (v2.0)
+
+    private var relatedOutfitsSection: some View {
+        let related = viewModel.outfits(containing: item)
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("出现在哪些搭配中")
+                .font(.headline)
+                .padding(.horizontal, 16)
+
+            if related.isEmpty {
+                HStack(spacing: 4) {
+                    Text("这件还没有搭配方案，去穿搭 Tab 新建一套吧")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(related) { outfit in
+                            RelatedOutfitCard(outfit: outfit)
+                                .onTapGesture {
+                                    if let suggestion = makeOutfitSuggestion(from: outfit) {
+                                        selectedRelatedOutfit = suggestion
+                                    }
+                                }
+                        }
+
+                        if related.count > 5 {
+                            Button {
+                                // Show all — for now just a placeholder (Phase B)
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "ellipsis.circle")
+                                        .font(.system(size: 32))
+                                        .foregroundColor(.secondary)
+                                    Text("查看全部\n\(related.count)套")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
+                                }
+                                .frame(width: 80, height: 150)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+        }
+    }
+
+    private func makeOutfitSuggestion(from outfit: Outfit) -> OutfitSuggestion? {
+        let idStrings = (outfit.itemIDs ?? "").split(separator: ",").map { String($0) }
+        let items = viewModel.items.filter { item in
+            guard let id = item.id else { return false }
+            return idStrings.contains(id.uuidString)
+        }
+        guard !items.isEmpty else { return nil }
+        return OutfitSuggestion(items: items, score: 1.0)
+    }
+
+    // MARK: - Notes Section
+
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("备注")
-                .font(.headline)
-            Text(editedTags.notes)
-                .font(.body)
-                .foregroundColor(.secondary)
+            Text("备注").font(.headline)
+            Text(editedTags.notes).font(.body).foregroundColor(.secondary)
         }
         .padding(.horizontal, 16)
     }
@@ -293,5 +331,36 @@ struct ClothingDetailView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM/dd"
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Related Outfit Card
+
+struct RelatedOutfitCard: View {
+    let outfit: Outfit
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LocalImageView(path: outfit.collagePath)
+                .frame(width: 100, height: 120)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 1)
+
+            Text(outfit.name ?? "未命名")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .frame(width: 100, alignment: .leading)
+
+            Text(outfit.occasion ?? "")
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color(.systemGray6))
+                .clipShape(Capsule())
+        }
+        .frame(width: 100)
     }
 }

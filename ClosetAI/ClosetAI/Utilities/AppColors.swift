@@ -2,6 +2,7 @@ import SwiftUI
 
 enum AppColors {
     static let accent = Color(hex: "#2D6CDF")
+    static let idle = Color(hex: "#E67E22")
     static let background = Color(.systemBackground)
     static let secondaryBackground = Color(.secondarySystemBackground)
     static let label = Color(.label)
