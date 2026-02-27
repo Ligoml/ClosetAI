@@ -10,44 +10,38 @@ struct TryOnView: View {
     @State private var showPhotoPicker = false
     @State private var collageImage: UIImage?
     @State private var isGeneratingCollage = false
-    @State private var sliderPosition: CGFloat = 0.5
     @State private var showSaveDialog = false
     @State private var outfitName = ""
     @State private var activeTab = 0 // 0: collage, 1: try-on
 
+    // 预处理后的对比图（固定 3:4 尺寸，保证对齐）
+    @State private var comparisonBefore: UIImage?
+    @State private var comparisonAfter: UIImage?
+
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Tab selector — 用自定义按钮代替 Picker，避免 iOS 26 beta 的 segmented 响应 bug
-                    HStack(spacing: 0) {
-                        ForEach([(0, "拼接效果图"), (1, "虚拟试穿")], id: \.0) { (idx, label) in
-                            Button {
-                                activeTab = idx
-                            } label: {
-                                Text(label)
-                                    .font(.subheadline)
-                                    .fontWeight(activeTab == idx ? .semibold : .regular)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(activeTab == idx ? AppColors.accent : Color(.systemGray5))
-                                    .foregroundColor(activeTab == idx ? .white : .primary)
-                            }
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            // ── Tab 选择器放在 ScrollView 外面，永远可见 ──
+            VStack(spacing: 0) {
+                tabSelector
                     .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
 
-                    if activeTab == 0 {
-                        collageSection
-                    } else {
-                        tryOnSection
+                Divider()
+
+                ScrollView {
+                    VStack(spacing: 24) {
+                        if activeTab == 0 {
+                            collageSection
+                        } else {
+                            tryOnSection
+                        }
+
+                        outfitItemsSection
+
+                        Spacer(minLength: 20)
                     }
-
-                    // Items in this outfit
-                    outfitItemsSection
-
-                    Spacer(minLength: 20)
+                    .padding(.top, 16)
                 }
             }
             .navigationTitle("穿搭效果")
@@ -63,19 +57,28 @@ struct TryOnView: View {
             }
             .alert("保存穿搭", isPresented: $showSaveDialog) {
                 TextField("穿搭名称", text: $outfitName)
-                Button("保存") {
-                    saveOutfit()
-                }
+                Button("保存") { saveOutfit() }
                 Button("取消", role: .cancel) {}
             }
             .onAppear {
-                // 自动加载设置中保存的模特图
-                if personImage == nil, let filename = UserDefaults.standard.string(forKey: "closetai.modelPhotoFilename") {
+                if personImage == nil,
+                   let filename = UserDefaults.standard.string(forKey: "closetai.modelPhotoFilename") {
                     personImage = ImageProcessingService.shared.loadImage(from: filename)
                 }
             }
+            // 试穿结果到来时，一次性归一化两张图
+            .onChange(of: outfitVM.tryOnResultImage) { result in
+                if let result = result, let person = personImage {
+                    buildComparisonImages(person: person, result: result)
+                }
+            }
+            // 切换模特图时清空旧对比图
+            .onChange(of: personImage) { _ in
+                outfitVM.tryOnResultImage = nil
+                comparisonBefore = nil
+                comparisonAfter = nil
+            }
         }
-        // sheet 放在 NavigationView 外面，避免嵌套问题
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPickerView(images: Binding(
                 get: { personImage.map { [$0] } ?? [] },
@@ -84,12 +87,39 @@ struct TryOnView: View {
         }
     }
 
+    // MARK: - Tab Selector
+
+    private var tabSelector: some View {
+        HStack(spacing: 0) {
+            tabButton(title: "拼接效果图", index: 0)
+            tabButton(title: "虚拟试穿",   index: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.systemGray4), lineWidth: 0.5))
+    }
+
+    private func tabButton(title: String, index: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                activeTab = index
+            }
+        } label: {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(activeTab == index ? .semibold : .regular)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(activeTab == index ? AppColors.accent : Color(.systemGray6))
+                .foregroundColor(activeTab == index ? .white : .primary)
+        }
+        .buttonStyle(.plain) // 防止 ScrollView 内 Button 的高亮延迟
+    }
+
     // MARK: - Collage Section
 
     private var collageSection: some View {
         VStack(spacing: 12) {
             if let collage = collageImage {
-                // 已生成：展示图片
                 Image(uiImage: collage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -124,7 +154,6 @@ struct TryOnView: View {
                 .padding(.horizontal, 16)
 
             } else if isGeneratingCollage {
-                // 生成中：loading
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(.systemGray6))
                     .frame(maxWidth: .infinity)
@@ -141,7 +170,6 @@ struct TryOnView: View {
                     )
                     .padding(.horizontal, 16)
             } else {
-                // 未生成：确认按钮
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(.systemGray6))
                     .frame(maxWidth: .infinity)
@@ -158,9 +186,7 @@ struct TryOnView: View {
                     )
                     .padding(.horizontal, 16)
 
-                Button {
-                    generateCollage()
-                } label: {
+                Button { generateCollage() } label: {
                     Label("生成穿搭平铺图", systemImage: "sparkles")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
@@ -168,6 +194,7 @@ struct TryOnView: View {
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 16)
             }
         }
@@ -178,7 +205,6 @@ struct TryOnView: View {
     private var tryOnSection: some View {
         VStack(spacing: 16) {
             if outfitVM.isTryingOn {
-                // Loading state with animated hanger
                 VStack(spacing: 20) {
                     hangerAnimation
                     Text("AI 正在为您试穿...")
@@ -192,28 +218,31 @@ struct TryOnView: View {
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 16)
-            } else if let tryOnResult = outfitVM.tryOnResultImage,
-                      let personImg = personImage {
-                // Split view comparison
-                ComparisonSlider(beforeImage: personImg, afterImage: tryOnResult)
+
+            } else if let before = comparisonBefore, let after = comparisonAfter {
+                // 两张图已归一化，直接传入 ComparisonSlider
+                ComparisonSlider(beforeImage: before, afterImage: after)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 400)
+                    .frame(height: 420)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 16)
 
-                Button {
-                    UIImageWriteToSavedPhotosAlbum(tryOnResult, nil, nil, nil)
-                } label: {
-                    Label("保存试穿结果", systemImage: "square.and.arrow.down")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AppColors.accent)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                if let result = outfitVM.tryOnResultImage {
+                    Button {
+                        UIImageWriteToSavedPhotosAlbum(result, nil, nil, nil)
+                    } label: {
+                        Label("保存试穿结果", systemImage: "square.and.arrow.down")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(AppColors.accent)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 16)
+
             } else if let person = personImage {
-                // 已有模特图：显示缩略预览，等待点击生成
                 VStack(spacing: 12) {
                     Image(uiImage: person)
                         .resizable()
@@ -232,8 +261,8 @@ struct TryOnView: View {
                     }
                 }
                 .padding(.vertical, 8)
+
             } else {
-                // 无模特图：引导上传
                 VStack(spacing: 16) {
                     Image(systemName: "person.crop.rectangle.badge.plus")
                         .font(.system(size: 48))
@@ -254,11 +283,12 @@ struct TryOnView: View {
                             .foregroundColor(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+                    .buttonStyle(.plain)
                 }
                 .padding(.vertical, 40)
             }
 
-            if let _ = personImage, !outfitVM.isTryingOn, outfitVM.tryOnResultImage == nil {
+            if personImage != nil, !outfitVM.isTryingOn, outfitVM.tryOnResultImage == nil {
                 Button {
                     guard let person = personImage else { return }
                     Task {
@@ -272,6 +302,7 @@ struct TryOnView: View {
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 16)
             }
 
@@ -281,9 +312,6 @@ struct TryOnView: View {
                     .font(.caption)
                     .padding(.horizontal, 16)
             }
-        }
-        .onChange(of: personImage) { _ in
-            outfitVM.tryOnResultImage = nil
         }
     }
 
@@ -302,7 +330,6 @@ struct TryOnView: View {
                             LocalImageView(path: item.flatLayImagePath ?? item.originalImagePath)
                                 .frame(width: 90, height: 90)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
-
                             Text(item.subCategory ?? item.category ?? "")
                                 .font(.caption)
                                 .lineLimit(1)
@@ -341,38 +368,44 @@ struct TryOnView: View {
     }
 
     private func saveOutfit() {
-        let name = outfitName.isEmpty ? "穿搭 \(Date().formatted(date: .abbreviated, time: .omitted))" : outfitName
-
+        let name = outfitName.isEmpty
+            ? "穿搭 \(Date().formatted(date: .abbreviated, time: .omitted))"
+            : outfitName
         if let collage = collageImage,
-           let path = ImageProcessingService.shared.saveImageToDocuments(collage, filename: "\(outfit.id.uuidString)_collage.jpg") {
+           let path = ImageProcessingService.shared.saveImageToDocuments(
+               collage, filename: "\(outfit.id.uuidString)_collage.jpg") {
             outfitVM.saveOutfit(outfit, collagePath: path, name: name)
         }
         dismiss()
     }
+
+    /// 把两张图居中裁剪到相同的 3:4 固定尺寸，保证 ComparisonSlider 完全对齐
+    private func buildComparisonImages(person: UIImage, result: UIImage) {
+        let targetSize = CGSize(width: 480, height: 640) // 固定 3:4，与 frame(height:420) 匹配
+        DispatchQueue.global(qos: .userInitiated).async {
+            let before = centerCrop(person, to: targetSize)
+            let after  = centerCrop(result,  to: targetSize)
+            DispatchQueue.main.async {
+                comparisonBefore = before
+                comparisonAfter  = after
+            }
+        }
+    }
 }
 
-// MARK: - Image Normalization Helper
+// MARK: - Center Crop Helper (file-private)
 
-/// 将 UIImage 居中裁剪并缩放到 targetSize，使两张图在 ComparisonSlider 中完全对齐
-private func normalizeImage(_ image: UIImage, to targetSize: CGSize) -> UIImage {
+private func centerCrop(_ image: UIImage, to targetSize: CGSize) -> UIImage {
     let format = UIGraphicsImageRendererFormat()
     format.scale = 1.0
     let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
     return renderer.image { _ in
-        let imageAspect = image.size.width / image.size.height
-        let targetAspect = targetSize.width / targetSize.height
-        let drawRect: CGRect
-        if imageAspect > targetAspect {
-            // 图片更宽 → 上下撑满，左右居中裁剪
-            let scaledWidth = targetSize.height * imageAspect
-            drawRect = CGRect(x: -(scaledWidth - targetSize.width) / 2, y: 0,
-                              width: scaledWidth, height: targetSize.height)
-        } else {
-            // 图片更高 → 左右撑满，上下居中裁剪
-            let scaledHeight = targetSize.width / imageAspect
-            drawRect = CGRect(x: 0, y: -(scaledHeight - targetSize.height) / 2,
-                              width: targetSize.width, height: scaledHeight)
-        }
+        let iw = image.size.width, ih = image.size.height
+        let tw = targetSize.width,  th = targetSize.height
+        let scale = max(tw / iw, th / ih)
+        let drawW = iw * scale, drawH = ih * scale
+        let drawRect = CGRect(x: (tw - drawW) / 2, y: (th - drawH) / 2,
+                              width: drawW, height: drawH)
         image.draw(in: drawRect)
     }
 }
@@ -380,29 +413,23 @@ private func normalizeImage(_ image: UIImage, to targetSize: CGSize) -> UIImage 
 // MARK: - Comparison Slider
 
 struct ComparisonSlider: View {
-    let beforeImage: UIImage
+    let beforeImage: UIImage  // 已经过 centerCrop，与 afterImage 同尺寸
     let afterImage: UIImage
 
     @State private var sliderOffset: CGFloat = 0.5
-    @GestureState private var isDragging = false
 
     var body: some View {
         GeometryReader { geo in
-            // 归一化到相同尺寸，保证两张图的内容区域完全对齐
-            let targetSize = geo.size
-            let normalizedBefore = normalizeImage(beforeImage, to: targetSize)
-            let normalizedAfter  = normalizeImage(afterImage,  to: targetSize)
-
             ZStack(alignment: .leading) {
-                // After image (full)
-                Image(uiImage: normalizedAfter)
+                // After image（试穿结果，全显）
+                Image(uiImage: afterImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
 
-                // Before image (clipped to left side)
-                Image(uiImage: normalizedBefore)
+                // Before image（原图，左侧裁剪显示）
+                Image(uiImage: beforeImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geo.size.width, height: geo.size.height)
@@ -413,13 +440,13 @@ struct ComparisonSlider: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     )
 
-                // Divider line
+                // 分割线
                 Rectangle()
                     .fill(Color.white)
                     .frame(width: 2)
                     .offset(x: geo.size.width * sliderOffset - 1)
 
-                // Handle
+                // 拖拽手柄
                 Circle()
                     .fill(Color.white)
                     .frame(width: 36, height: 36)
@@ -435,22 +462,18 @@ struct ComparisonSlider: View {
                     .shadow(radius: 4)
                     .offset(x: geo.size.width * sliderOffset - 18)
 
-                // Labels
+                // 标签
                 VStack {
                     HStack {
                         Text("原图")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(6)
+                            .font(.caption).fontWeight(.semibold)
+                            .foregroundColor(.white).padding(6)
                             .background(Color.black.opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                         Spacer()
                         Text("试穿")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(6)
+                            .font(.caption).fontWeight(.semibold)
+                            .foregroundColor(.white).padding(6)
                             .background(Color.black.opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
@@ -461,8 +484,7 @@ struct ComparisonSlider: View {
             .gesture(
                 DragGesture()
                     .onChanged { value in
-                        let newOffset = value.location.x / geo.size.width
-                        sliderOffset = max(0.05, min(0.95, newOffset))
+                        sliderOffset = max(0.05, min(0.95, value.location.x / geo.size.width))
                     }
             )
         }
