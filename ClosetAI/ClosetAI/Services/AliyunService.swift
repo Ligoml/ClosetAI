@@ -213,12 +213,14 @@ class AliyunService: ObservableObject {
 
     func generateAICollage(imageDatas: [Data], itemDescriptions: [String]) async throws -> Data {
         guard !imageDatas.isEmpty else { throw AliyunError.apiError("No images provided") }
-        let itemDesc = itemDescriptions.isEmpty ? "这些服装单品" : itemDescriptions.joined(separator: "、")
+        let numbered = itemDescriptions.enumerated().map { "第\($0.offset + 1)件：\($0.element)" }.joined(separator: "；")
+        let itemList = numbered.isEmpty ? "共 \(imageDatas.count) 件服装" : numbered
         let prompt = """
-        将以下\(imageDatas.count)件服装（\(itemDesc)）原样平铺排列成穿搭展示图。\
-        白色干净背景；上装在上、下装居中、外套覆盖上装外侧、鞋子置于最下方，衣物间自然叠放；\
-        每件衣物的长度、廓形、颜色、图案必须与原图完全一致，禁止改变形态或重新绘制；\
-        整体俯视平铺视角，时尚杂志 flat lay 风格构图。
+        严格只使用以下 \(imageDatas.count) 件参考服装（\(itemList)），不得添加、替换或凭空生成任何额外单品。\
+        将这 \(imageDatas.count) 件衣物原样平铺排列成一张穿搭 flat lay 展示图：\
+        纯白背景；上装居上、下装居中、外套叠于上装外侧、鞋包置最下方，各件自然错落；\
+        每件衣物的款式、长度、廓形、颜色、图案、细节必须与对应参考图完全一致，\
+        严禁改变任何形态、增减细节或重绘；整体俯视平铺，时尚杂志 flat lay 构图风格。
         """
         return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
     }

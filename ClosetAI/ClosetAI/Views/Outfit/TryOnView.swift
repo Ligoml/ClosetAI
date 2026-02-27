@@ -19,12 +19,23 @@ struct TryOnView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Tab selector
-                    Picker("展示方式", selection: $activeTab) {
-                        Text("拼接效果图").tag(0)
-                        Text("虚拟试穿").tag(1)
+                    // Tab selector — 用自定义按钮代替 Picker，避免 iOS 26 beta 的 segmented 响应 bug
+                    HStack(spacing: 0) {
+                        ForEach([(0, "拼接效果图"), (1, "虚拟试穿")], id: \.0) { (idx, label) in
+                            Button {
+                                activeTab = idx
+                            } label: {
+                                Text(label)
+                                    .font(.subheadline)
+                                    .fontWeight(activeTab == idx ? .semibold : .regular)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(activeTab == idx ? AppColors.accent : Color(.systemGray5))
+                                    .foregroundColor(activeTab == idx ? .white : .primary)
+                            }
+                        }
                     }
-                    .pickerStyle(.segmented)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                     .padding(.horizontal, 16)
 
                     if activeTab == 0 {
@@ -340,6 +351,32 @@ struct TryOnView: View {
     }
 }
 
+// MARK: - Image Normalization Helper
+
+/// 将 UIImage 居中裁剪并缩放到 targetSize，使两张图在 ComparisonSlider 中完全对齐
+private func normalizeImage(_ image: UIImage, to targetSize: CGSize) -> UIImage {
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1.0
+    let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+    return renderer.image { _ in
+        let imageAspect = image.size.width / image.size.height
+        let targetAspect = targetSize.width / targetSize.height
+        let drawRect: CGRect
+        if imageAspect > targetAspect {
+            // 图片更宽 → 上下撑满，左右居中裁剪
+            let scaledWidth = targetSize.height * imageAspect
+            drawRect = CGRect(x: -(scaledWidth - targetSize.width) / 2, y: 0,
+                              width: scaledWidth, height: targetSize.height)
+        } else {
+            // 图片更高 → 左右撑满，上下居中裁剪
+            let scaledHeight = targetSize.width / imageAspect
+            drawRect = CGRect(x: 0, y: -(scaledHeight - targetSize.height) / 2,
+                              width: targetSize.width, height: scaledHeight)
+        }
+        image.draw(in: drawRect)
+    }
+}
+
 // MARK: - Comparison Slider
 
 struct ComparisonSlider: View {
@@ -351,16 +388,21 @@ struct ComparisonSlider: View {
 
     var body: some View {
         GeometryReader { geo in
+            // 归一化到相同尺寸，保证两张图的内容区域完全对齐
+            let targetSize = geo.size
+            let normalizedBefore = normalizeImage(beforeImage, to: targetSize)
+            let normalizedAfter  = normalizeImage(afterImage,  to: targetSize)
+
             ZStack(alignment: .leading) {
                 // After image (full)
-                Image(uiImage: afterImage)
+                Image(uiImage: normalizedAfter)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
 
                 // Before image (clipped to left side)
-                Image(uiImage: beforeImage)
+                Image(uiImage: normalizedBefore)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geo.size.width, height: geo.size.height)
