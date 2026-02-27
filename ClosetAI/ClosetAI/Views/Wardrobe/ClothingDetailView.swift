@@ -46,17 +46,26 @@ struct ClothingDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(isEditing ? "保存" : "编辑") {
+                    Button {
                         if isEditing { viewModel.updateItem(item, tags: editedTags) }
                         isEditing.toggle()
+                    } label: {
+                        Image(systemName: isEditing ? "checkmark" : "pencil")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(AppColors.accent)
                     }
-                    .foregroundColor(AppColors.accent)
                 }
             }
         }
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(false)
         .sheet(item: $selectedRelatedOutfit) { outfit in
             OutfitDetailView(outfit: outfit)
                 .environmentObject(outfitVM)

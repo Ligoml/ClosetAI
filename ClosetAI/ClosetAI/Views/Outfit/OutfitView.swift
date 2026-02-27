@@ -27,7 +27,7 @@ struct OutfitView: View {
                 }
             }
             .navigationTitle("穿搭")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .onAppear { outfitVM.loadSavedOutfits() }
         }
         // FAB overlay
@@ -276,7 +276,11 @@ struct OutfitDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {

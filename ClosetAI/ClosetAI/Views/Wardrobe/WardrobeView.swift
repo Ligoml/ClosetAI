@@ -82,7 +82,7 @@ struct WardrobeView: View {
                 }
             }
             .navigationTitle("衣橱")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     trashButton
