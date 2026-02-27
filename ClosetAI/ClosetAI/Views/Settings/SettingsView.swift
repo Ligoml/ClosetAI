@@ -26,6 +26,7 @@ struct SettingsView: View {
                 // App Info
                 infoSection
             }
+            .font(.subheadline)
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.large)
             .alert("已保存", isPresented: $settingsVM.showSavedAlert) {
@@ -64,7 +65,6 @@ struct SettingsView: View {
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("已设置模特图")
-                                .font(.subheadline)
                                 .fontWeight(.medium)
                             Text("虚拟试穿时将自动使用此图片")
                                 .font(.caption)
@@ -73,14 +73,12 @@ struct SettingsView: View {
                                 Button("更换") {
                                     showModelPhotoPicker = true
                                 }
-                                .font(.subheadline)
                                 .foregroundColor(AppColors.accent)
 
                                 Button("删除") {
                                     settingsVM.clearModelPhoto()
                                     modelPhoto = nil
                                 }
-                                .font(.subheadline)
                                 .foregroundColor(.red)
                             }
                         }
@@ -97,7 +95,6 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("上传模特图")
                                     .foregroundColor(.primary)
-                                    .font(.subheadline)
                                     .fontWeight(.medium)
                                 Text("虚拟试穿时无需每次重新上传")
                                     .font(.caption)
@@ -126,7 +123,6 @@ struct SettingsView: View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
                 Label("DashScope API Key", systemImage: "key")
-                    .font(.subheadline)
                     .fontWeight(.medium)
                 SecureField("请输入 API Key", text: $settingsVM.dashscopeAPIKey)
                     .textFieldStyle(.roundedBorder)
@@ -136,13 +132,11 @@ struct SettingsView: View {
                     settingsVM.saveAPIKey()
                 }
                 .foregroundColor(AppColors.accent)
-                .font(.subheadline)
             }
             .padding(.vertical, 4)
 
             NavigationLink(destination: APIGuideView()) {
                 Label("如何获取 API Key", systemImage: "questionmark.circle")
-                    .font(.subheadline)
             }
         } header: {
             Text("阿里云配置")

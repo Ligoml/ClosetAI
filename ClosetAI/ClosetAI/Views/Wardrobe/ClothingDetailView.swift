@@ -27,7 +27,33 @@ struct ClothingDetailView: View {
     }
 
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // Custom nav bar — no NavigationView avoids gesture conflict with sheet dismiss
+            ZStack {
+                Text(item.subCategory ?? item.category ?? "服装详情")
+                    .font(.system(size: 15, weight: .semibold))
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .padding(8)
+                    }
+                    Spacer()
+                    Button {
+                        if isEditing { viewModel.updateItem(item, tags: editedTags) }
+                        isEditing.toggle()
+                    } label: {
+                        Image(systemName: isEditing ? "checkmark" : "pencil")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(AppColors.accent)
+                            .padding(8)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 12)
+            Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     imageSection
@@ -41,31 +67,10 @@ struct ClothingDetailView: View {
                         notesSection
                     }
                 }
-            }
-            .navigationTitle(item.subCategory ?? item.category ?? "服装详情")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        if isEditing { viewModel.updateItem(item, tags: editedTags) }
-                        isEditing.toggle()
-                    } label: {
-                        Image(systemName: isEditing ? "checkmark" : "pencil")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppColors.accent)
-                    }
-                }
+                .padding(.bottom, 32)
             }
         }
         .presentationDragIndicator(.visible)
-        .interactiveDismissDisabled(false)
         .sheet(item: $selectedRelatedOutfit) { outfit in
             OutfitDetailView(outfit: outfit)
                 .environmentObject(outfitVM)
@@ -331,11 +336,6 @@ struct AllRelatedOutfitsSheet: View {
             .background(Color(.systemGray6).ignoresSafeArea())
             .navigationTitle("相关搭配（\(relatedOutfits.count)套）")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { dismiss() }
-                }
-            }
         }
         .sheet(item: $selectedOutfit) { outfit in
             OutfitDetailView(outfit: outfit)

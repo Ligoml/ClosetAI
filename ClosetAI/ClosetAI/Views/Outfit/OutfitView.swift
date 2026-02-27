@@ -69,9 +69,14 @@ struct OutfitView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Section header
             HStack {
-                Text("\(occasion)  \(outfits.count)")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
+                HStack(spacing: 5) {
+                    Text(occasion)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text("\(outfits.count)")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
                 Button {
                     showAllOccasion = occasion
@@ -220,11 +225,6 @@ struct OccasionAllOutfitsSheet: View {
             .background(Color(.systemGray6).ignoresSafeArea())
             .navigationTitle("\(occasion) · \(outfits.count)套")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { dismiss() }
-                }
-            }
         }
         .sheet(item: $selectedOutfit) { outfit in
             OutfitDetailView(outfit: outfit)

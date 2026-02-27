@@ -196,9 +196,14 @@ struct WardrobeView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Section header
             HStack {
-                Text("\(name)  \(items.count)")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
+                HStack(spacing: 5) {
+                    Text(name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text("\(items.count)")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
                 Button {
                     showAllSectionItems = items
@@ -438,11 +443,6 @@ struct CategoryGridSheet: View {
             .background(Color(.systemGray6).ignoresSafeArea())
             .navigationTitle("\(title) · \(items.count)件")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { dismiss() }
-                }
-            }
         }
     }
 }
@@ -490,11 +490,6 @@ struct DeletedItemsView: View {
             }
             .navigationTitle("已删除")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { dismiss() }
-                }
-            }
         }
     }
 }
