@@ -149,12 +149,13 @@ class AliyunService: ObservableObject {
         let apiKey = dashscopeAPIKey
         guard !apiKey.isEmpty else { throw AliyunError.missingAPIKey }
 
-        // Build content array: text prompt first, then reference images
-        var content: [[String: Any]] = [["text": prompt]]
+        // 图片放在前面，文字指令放最后——让模型先看图再读规则，提升图像内容遵从度
+        var content: [[String: Any]] = []
         for imageData in images.prefix(4) {
             let base64 = imageData.base64EncodedString()
             content.append(["image": "data:image/jpeg;base64,\(base64)"])
         }
+        content.append(["text": prompt])
 
         let requestBody: [String: Any] = [
             "model": "wan2.6-image",
@@ -214,18 +215,32 @@ class AliyunService: ObservableObject {
     func generateAICollage(imageDatas: [Data], itemDescriptions: [String]) async throws -> Data {
         guard !imageDatas.isEmpty else { throw AliyunError.apiError("No images provided") }
         let n = imageDatas.count
-        let numbered = itemDescriptions.enumerated().map { "第\($0.offset + 1)件：\($0.element)" }.joined(separator: "；")
-        let itemList = numbered.isEmpty ? "共 \(n) 件服装" : numbered
+        let itemList = itemDescriptions.enumerated()
+            .map { "图\($0.offset + 1)=\($0.element)" }
+            .joined(separator: "、")
         let prompt = """
-        你是专业时尚 flat lay 摄影师。我提供了 \(n) 张参考服装图（\(itemList)）。\
-        请严格按以下规则生成一张穿搭平铺展示图：\
-        【数量】画面中必须包含且只包含这 \(n) 件衣物，每件恰好出现一次，不得遗漏任何一件，也不得重复出现同一件；\
-        【还原】每件衣物的颜色、图案、款式、长度、廓形必须与对应参考图完全一致，不得改变或重绘；\
-        【背景】纯白干净背景，整体俯视平铺（flat lay）视角；\
-        【布局】上装居上，下装居中，外套叠于上装外侧，鞋包置最下方，各件自然错落；\
-        【风格】时尚杂志 flat lay 构图，整洁美观。
+        上方共 \(n) 张服装图（\(itemList)）。\
+        硬规则（不可违反）：\
+        ①画面服装件数必须恰好为 \(n)，不多不少；\
+        ②仅使用上方图片中的服装，不得凭空添加任何其他单品；\
+        ③每件保持原图颜色、图案、款式、长度完全不变。\
+        软要求：纯白背景；俯视平铺 flat lay；上装居上、下装居中、鞋包居下；整洁美观。
         """
         return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
+    }
+
+    // MARK: - Collage Visual Enhancement (wan2.6)
+    // 输入：Core Graphics 合成的准确平铺图；AI 只做视觉增强，不改变衣物数量和内容
+
+    func enhanceCollage(baseCollageData: Data) async throws -> Data {
+        let prompt = """
+        这是一张已经合成好的服装 flat lay 穿搭图（Core Graphics 合成）。\
+        请在完全保留画面中所有衣物的原始数量、位置和内容不变的前提下，\
+        优化整体视觉质感：光影更立体自然、衣物褶皱纹理更真实、背景更纯白干净，\
+        整体达到时尚杂志 flat lay 级别的视觉效果。\
+        严禁添加、删除、替换或移动任何衣物。
+        """
+        return try await callWan26Image(images: [baseCollageData], prompt: prompt, size: "1024*1024")
     }
 
     // MARK: - Virtual Try-On (wan2.6)

@@ -224,7 +224,7 @@ class OutfitViewModel: ObservableObject {
 
         guard !imageDatas.isEmpty else { return nil }
 
-        // Try AI collage first; fall back to Core Graphics on any error
+        // AI 直接生成平铺图，失败时降级到 Core Graphics
         do {
             let resultData = try await aliyunService.generateAICollage(
                 imageDatas: imageDatas,
@@ -237,7 +237,6 @@ class OutfitViewModel: ObservableObject {
             print("AI collage error, falling back to Core Graphics: \(error)")
         }
 
-        // Fallback: Core Graphics collage
         return imageService.generateOutfitCollage(items: fallbackItems)
     }
 
