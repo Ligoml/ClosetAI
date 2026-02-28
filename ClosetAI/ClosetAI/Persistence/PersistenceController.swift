@@ -129,7 +129,8 @@ class PersistenceController {
 
     // MARK: - Outfit CRUD
 
-    func createOutfit(from model: OutfitModel) {
+    @discardableResult
+    func createOutfit(from model: OutfitModel) -> Outfit {
         let context = container.viewContext
         let entity = Outfit(context: context)
         entity.id = model.id
@@ -140,6 +141,7 @@ class PersistenceController {
         entity.isFavorite = model.isFavorite
         entity.createdAt = model.createdAt
         save()
+        return entity
     }
 
     func fetchOutfits() -> [Outfit] {
