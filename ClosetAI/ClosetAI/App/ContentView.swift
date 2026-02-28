@@ -8,21 +8,21 @@ struct ContentView: View {
         TabView {
             WardrobeView()
                 .tabItem {
-                    Label("衣橱", systemImage: "tshirt")
+                    Label("衣橱", systemImage: "hanger")
                 }
                 .environmentObject(wardrobeVM)
                 .environmentObject(outfitVM)
 
             OutfitView()
                 .tabItem {
-                    Label("穿搭", systemImage: "rectangle.stack.person.crop")
+                    Label("穿搭", systemImage: "wand.and.stars")
                 }
                 .environmentObject(outfitVM)
                 .environmentObject(wardrobeVM)
 
             SettingsView()
                 .tabItem {
-                    Label("设置", systemImage: "gearshape")
+                    Label("设置", systemImage: "slider.horizontal.3")
                 }
                 .environmentObject(wardrobeVM)
         }

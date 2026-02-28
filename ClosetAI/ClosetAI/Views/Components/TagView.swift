@@ -14,6 +14,7 @@ struct TagView: View {
                     .background(color.opacity(0.12))
                     .foregroundColor(color)
                     .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 1)
             }
         }
     }

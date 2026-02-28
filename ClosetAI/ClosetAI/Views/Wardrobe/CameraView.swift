@@ -47,11 +47,12 @@ struct CameraView: UIViewControllerRepresentable {
 
 struct PhotoPickerView: UIViewControllerRepresentable {
     @Binding var images: [UIImage]
+    var selectionLimit: Int = 1
     @Environment(\.dismiss) var dismiss
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var config = PHPickerConfiguration()
-        config.selectionLimit = 10
+        config.selectionLimit = selectionLimit
         config.filter = .images
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator

@@ -49,6 +49,7 @@ extension Outfit {
     @NSManaged public var collagePath: String?
     @NSManaged public var isFavorite: Bool
     @NSManaged public var createdAt: Date?
+    @NSManaged public var tryOnResultPath: String?
 }
 
 extension Outfit: Identifiable {}

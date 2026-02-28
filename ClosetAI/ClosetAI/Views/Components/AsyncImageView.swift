@@ -23,7 +23,7 @@ struct LocalImageView: View {
             }
         }
         .onAppear { loadImage() }
-        .onChange(of: path) { _ in loadImage() }
+        .onChange(of: path) { _, _ in loadImage() }
     }
 
     private func loadImage() {

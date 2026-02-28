@@ -75,7 +75,7 @@ class OutfitViewModel: ObservableObject {
 
     // MARK: - Save Outfit
 
-    func saveOutfit(_ suggestion: OutfitSuggestion, collagePath: String, name: String, occasion: String) {
+    func saveOutfit(_ suggestion: OutfitSuggestion, collagePath: String, name: String, occasion: String, tryOnResult: UIImage? = nil) {
         let itemIDs = suggestion.items.compactMap { $0.id }
         let model = OutfitModel(
             name: name,
@@ -83,7 +83,15 @@ class OutfitViewModel: ObservableObject {
             occasion: occasion,
             collagePath: collagePath
         )
-        persistence.createOutfit(from: model)
+        let newOutfit = persistence.createOutfit(from: model)
+
+        // 若同时生成了上身图，一并写入
+        if let tryOnImage = tryOnResult {
+            let filename = "\(newOutfit.id?.uuidString ?? UUID().uuidString)_tryon.jpg"
+            if let path = imageService.saveImageToDocuments(tryOnImage, filename: filename) {
+                newOutfit.tryOnResultPath = path
+            }
+        }
 
         for item in suggestion.items {
             item.lastRecommendedAt = Date()
@@ -110,9 +118,27 @@ class OutfitViewModel: ObservableObject {
             let resolvedPath = LocalImageView.resolvePath(collagePath)
             try? FileManager.default.removeItem(atPath: resolvedPath)
         }
+        if let tryOnPath = outfit.tryOnResultPath, !tryOnPath.isEmpty {
+            let resolvedPath = LocalImageView.resolvePath(tryOnPath)
+            try? FileManager.default.removeItem(atPath: resolvedPath)
+        }
         persistence.deleteOutfit(outfit)
         loadSavedOutfits()
         NotificationCenter.default.post(name: .closetAIOutfitsDidChange, object: nil)
+    }
+
+    // MARK: - Save Try-On Result
+
+    func saveTryOnResult(_ image: UIImage, for outfit: Outfit) {
+        let filename = "\(outfit.id?.uuidString ?? UUID().uuidString)_tryon.jpg"
+        if let oldPath = outfit.tryOnResultPath, !oldPath.isEmpty {
+            try? FileManager.default.removeItem(atPath: LocalImageView.resolvePath(oldPath))
+        }
+        if let path = imageService.saveImageToDocuments(image, filename: filename) {
+            outfit.tryOnResultPath = path
+            persistence.save()
+            loadSavedOutfits()
+        }
     }
 
     // MARK: - Virtual Try-On

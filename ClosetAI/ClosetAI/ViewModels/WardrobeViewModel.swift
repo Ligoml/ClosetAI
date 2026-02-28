@@ -101,11 +101,19 @@ class WardrobeViewModel: ObservableObject {
     var totalCount: Int { items.filter { !$0.isSoftDeleted }.count }
     var idleCount: Int { idleItemIDs.count }
 
+    /// 衣物「上次穿着」日期：取包含该衣物的所有穿搭中最晚的 createdAt
+    func lastOutfitDate(for item: ClothingItem) -> Date? {
+        outfits(containing: item)
+            .compactMap { $0.createdAt }
+            .max()
+    }
+
+    /// 近 90 天未穿：从未加入穿搭，或最近穿搭创建时间超过 90 天
     var notWornRecently: [ClothingItem] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: Date()) ?? Date()
         return items.filter { item in
             guard !item.isSoftDeleted else { return false }
-            guard let lastWorn = item.lastWornDate else { return true }
+            guard let lastWorn = lastOutfitDate(for: item) else { return true }
             return lastWorn < cutoff
         }
     }

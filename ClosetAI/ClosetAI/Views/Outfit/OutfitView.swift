@@ -7,9 +7,10 @@ struct OutfitView: View {
     @State private var selectedOutfit: Outfit?
     @State private var showManualOutfit = false
     @State private var showAllOccasion: String? = nil
+    @State private var outfitToDelete: Outfit? = nil
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color(.systemGray6).ignoresSafeArea()
 
@@ -27,8 +28,20 @@ struct OutfitView: View {
                 }
             }
             .navigationTitle("穿搭")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear { outfitVM.loadSavedOutfits() }
+            .alert("确认删除？", isPresented: Binding(
+                get: { outfitToDelete != nil },
+                set: { if !$0 { outfitToDelete = nil } }
+            )) {
+                Button("删除穿搭", role: .destructive) {
+                    if let outfit = outfitToDelete { outfitVM.deleteOutfit(outfit) }
+                    outfitToDelete = nil
+                }
+                Button("取消", role: .cancel) { outfitToDelete = nil }
+            } message: {
+                Text("删除后无法恢复")
+            }
         }
         // FAB overlay
         .overlay(alignment: .bottomTrailing) {
@@ -98,7 +111,7 @@ struct OutfitView: View {
                             .onTapGesture { selectedOutfit = outfit }
                             .contextMenu {
                                 Button(role: .destructive) {
-                                    outfitVM.deleteOutfit(outfit)
+                                    outfitToDelete = outfit
                                 } label: {
                                     Label("删除穿搭", systemImage: "trash")
                                 }
@@ -117,15 +130,16 @@ struct OutfitView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Spacer(minLength: 60)
-            Image(systemName: "rectangle.stack.person.crop")
-                .font(.system(size: 60))
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 52))
                 .foregroundColor(Color(.systemGray4))
             Text("还没有保存的搭配")
-                .font(.title2)
+                .font(.title3)
                 .fontWeight(.medium)
             Text("点击右下角 + 创建你的第一套搭配")
+                .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             Spacer(minLength: 60)
@@ -138,12 +152,12 @@ struct OutfitView: View {
     private var fabButton: some View {
         Button { showManualOutfit = true } label: {
             Image(systemName: "plus")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
-                .frame(width: 56, height: 56)
+                .frame(width: 48, height: 48)
                 .background(AppColors.accent)
                 .clipShape(Circle())
-                .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 4)
+                .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 3)
         }
         .padding(.trailing, 24)
         .padding(.bottom, 32)
@@ -187,12 +201,13 @@ struct OccasionAllOutfitsSheet: View {
 
     @Environment(\.dismiss) var dismiss
     @State private var selectedOutfit: Outfit?
+    @State private var outfitToDelete: Outfit? = nil
 
     private var outfits: [Outfit] { outfitVM.outfits(for: occasion) }
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 if outfits.isEmpty {
                     VStack(spacing: 16) {
@@ -212,7 +227,7 @@ struct OccasionAllOutfitsSheet: View {
                                 .onTapGesture { selectedOutfit = outfit }
                                 .contextMenu {
                                     Button(role: .destructive) {
-                                        outfitVM.deleteOutfit(outfit)
+                                        outfitToDelete = outfit
                                     } label: {
                                         Label("删除穿搭", systemImage: "trash")
                                     }
@@ -225,6 +240,18 @@ struct OccasionAllOutfitsSheet: View {
             .background(Color(.systemGray6).ignoresSafeArea())
             .navigationTitle("\(occasion) · \(outfits.count)套")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("确认删除？", isPresented: Binding(
+                get: { outfitToDelete != nil },
+                set: { if !$0 { outfitToDelete = nil } }
+            )) {
+                Button("删除穿搭", role: .destructive) {
+                    if let outfit = outfitToDelete { outfitVM.deleteOutfit(outfit) }
+                    outfitToDelete = nil
+                }
+                Button("取消", role: .cancel) { outfitToDelete = nil }
+            } message: {
+                Text("删除后无法恢复")
+            }
         }
         .sheet(item: $selectedOutfit) { outfit in
             OutfitDetailView(outfit: outfit)
@@ -260,11 +287,14 @@ struct OutfitDetailView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         collagSection
+                        if outfit.tryOnResultPath != nil {
+                            tryOnResultSection
+                        }
                         itemsSection
                     }
                     .padding(.bottom, 16)
@@ -292,7 +322,7 @@ struct OutfitDetailView: View {
                         Button(role: .destructive) {
                             showDeleteConfirm = true
                         } label: {
-                            Label("删除搭配", systemImage: "trash")
+                            Label("删除穿搭", systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -300,9 +330,18 @@ struct OutfitDetailView: View {
                     }
                 }
             }
+            .alert("确认删除？", isPresented: $showDeleteConfirm) {
+                Button("删除穿搭", role: .destructive) {
+                    outfitVM.deleteOutfit(outfit)
+                    dismiss()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("删除后无法恢复")
+            }
         }
         .sheet(isPresented: $showTryOn) {
-            TryOnView(outfit: outfitSuggestion)
+            TryOnView(outfit: outfitSuggestion, savedOutfit: outfit)
                 .environmentObject(outfitVM)
         }
         .sheet(isPresented: $showEditSheet) {
@@ -314,14 +353,28 @@ struct OutfitDetailView: View {
                 .environmentObject(wardrobeVM)
                 .environmentObject(outfitVM)
         }
-        .confirmationDialog("删除搭配", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-            Button("删除", role: .destructive) {
-                outfitVM.deleteOutfit(outfit)
-                dismiss()
+    }
+
+    // MARK: - Try-On Result Section
+
+    private var tryOnResultSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("上次试穿效果")
+                    .font(.headline)
+                Spacer()
+                Text("点击下方按钮重新生成")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("删除后无法恢复")
+            .padding(.horizontal, 16)
+
+            LocalImageView(path: outfit.tryOnResultPath, contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: 300)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
         }
     }
 
@@ -383,18 +436,22 @@ struct OutfitDetailView: View {
     // MARK: - Try-On Button
 
     private var tryOnButton: some View {
-        VStack(spacing: 0) {
+        let hasResult = outfit.tryOnResultPath != nil
+        return VStack(spacing: 0) {
             Divider()
             Button {
                 showTryOn = true
             } label: {
-                Label("虚拟试穿", systemImage: "person.crop.rectangle.badge.plus")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(AppColors.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                Label(
+                    hasResult ? "重新试穿" : "虚拟试穿",
+                    systemImage: hasResult ? "arrow.clockwise" : "person.crop.rectangle.badge.plus"
+                )
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(AppColors.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 16)
@@ -415,7 +472,7 @@ struct EditOutfitSheet: View {
     @State private var occasion: String = ""
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section("搭配名称") {
                     TextField("名称（留空则自动命名）", text: $name)
@@ -434,15 +491,21 @@ struct EditOutfitSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("取消") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("保存") {
+                    Button {
                         outfitVM.updateOutfit(outfit, name: name, occasion: occasion)
                         dismiss()
+                    } label: {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColors.accent)
                     }
-                    .fontWeight(.semibold)
-                    .foregroundColor(AppColors.accent)
                 }
             }
         }

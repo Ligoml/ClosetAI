@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var showModelPhotoPicker = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 // API Configuration
                 apiSection
@@ -27,8 +27,9 @@ struct SettingsView: View {
                 infoSection
             }
             .font(.subheadline)
+            .scrollDismissesKeyboard(.immediately)
             .navigationTitle("设置")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .alert("已保存", isPresented: $settingsVM.showSavedAlert) {
                 Button("确定") {}
             }
@@ -55,11 +56,12 @@ struct SettingsView: View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
                 if let photo = modelPhoto {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 14) {
+                        // 768:1280 = 3:5，按比例等比缩小展示
                         Image(uiImage: photo)
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 72, height: 96)
+                            .scaledToFill()
+                            .frame(width: 60, height: 100)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.systemGray4), lineWidth: 0.5))
 
@@ -69,19 +71,22 @@ struct SettingsView: View {
                             Text("虚拟试穿时将自动使用此图片")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            HStack(spacing: 12) {
+                            HStack(spacing: 16) {
                                 Button("更换") {
                                     showModelPhotoPicker = true
                                 }
                                 .foregroundColor(AppColors.accent)
+                                .buttonStyle(.borderless)
 
                                 Button("删除") {
                                     settingsVM.clearModelPhoto()
                                     modelPhoto = nil
                                 }
                                 .foregroundColor(.red)
+                                .buttonStyle(.borderless)
                             }
                         }
+                        Spacer()
                     }
                     .padding(.vertical, 4)
                 } else {
@@ -202,7 +207,7 @@ struct SettingsView: View {
             }
 
             LabeledContent {
-                Text("iOS 16+")
+                Text("iOS 26+")
                     .foregroundColor(.secondary)
             } label: {
                 Label("平台", systemImage: "iphone")
@@ -272,7 +277,7 @@ struct APIGuideView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Group {
                     Text("如何获取 API Key")
-                        .font(.title2)
+                        .font(.title3)
                         .fontWeight(.bold)
 
                     stepView(number: 1, title: "访问阿里云百炼控制台",
@@ -282,7 +287,7 @@ struct APIGuideView: View {
                              description: "使用阿里云账号登录，若没有账号可免费注册")
 
                     stepView(number: 3, title: "创建 API Key",
-                             description: "进入控制台后，点击右上角头像或左侧菜单中的「API-KEY 管理」，点击「创建 API Key」")
+                             description: "进入控制台后，点击左下角菜单中的「密钥管理」，点击「创建 API Key」")
 
                     stepView(number: 4, title: "复制并填入",
                              description: "复制生成的 API Key，粘贴到上方输入框，点击「保存 API Key」即可")
@@ -293,9 +298,10 @@ struct APIGuideView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("计费说明")
-                        .font(.headline)
-                    Text("• 自动打标（qwen-vl-plus）：根据实际用量计费\n• 穿搭平铺图 / 虚拟试穿（wan2.6-image）：根据实际用量计费\n• 新用户通常有免费额度可使用")
                         .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Text("• 自动打标（qwen-vl-plus）：根据实际用量计费\n• 穿搭平铺图 / 虚拟试穿（wan2.6-image）：根据实际用量计费\n• 新用户通常有免费额度可使用")
+                        .font(.footnote)
                         .foregroundColor(.secondary)
 
                     // 可点击的链接
@@ -304,7 +310,7 @@ struct APIGuideView: View {
                             Image(systemName: "arrow.up.right.square")
                             Text("直接跳转到 API Key 管理页面")
                         }
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundColor(.blue)
                     }
                     .padding(.top, 4)
@@ -321,19 +327,20 @@ struct APIGuideView: View {
         HStack(alignment: .top, spacing: 12) {
             Circle()
                 .fill(AppColors.accent)
-                .frame(width: 28, height: 28)
+                .frame(width: 24, height: 24)
                 .overlay(
                     Text("\(number)")
-                        .font(.caption)
+                        .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                 )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
+                    .font(.subheadline)
                     .fontWeight(.semibold)
                 Text(description)
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundColor(.secondary)
             }
         }
@@ -359,7 +366,7 @@ struct ColorDistributionView: View {
                 HStack {
                     Circle()
                         .fill(colorForName(color))
-                        .frame(width: 16, height: 16)
+                        .frame(width: 14, height: 14)
                         .overlay(Circle().stroke(Color(.systemGray4), lineWidth: 0.5))
                     Text(color)
                     Spacer()
@@ -369,29 +376,89 @@ struct ColorDistributionView: View {
                     // Progress bar
                     RoundedRectangle(cornerRadius: 4)
                         .fill(AppColors.accent.opacity(0.3))
-                        .frame(width: CGFloat(count) / CGFloat(max(total, 1)) * 80, height: 8)
+                        .frame(width: CGFloat(count) / CGFloat(max(total, 1)) * 80, height: 6)
                 }
             }
         }
+        .font(.subheadline)
         .navigationTitle("颜色分布")
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private func colorForName(_ name: String) -> Color {
-        switch name {
-        case "黑", "黑色": return .black
-        case "白", "白色": return .white
-        case "灰", "灰色": return .gray
-        case "红", "红色": return .red
-        case "蓝", "蓝色": return .blue
-        case "绿", "绿色": return .green
-        case "黄", "黄色": return .yellow
-        case "橙", "橙色": return .orange
-        case "粉", "粉色": return .pink
-        case "紫", "紫色": return .purple
-        case "棕", "棕色", "咖色": return .brown
-        default: return .gray
+        // 优先精确匹配，再通过关键词模糊匹配
+        let n = name
+
+        // 黑色系
+        if n.contains("黑") { return .black }
+
+        // 白色系（米白、象牙白、奶白、珍珠白 先于"白"匹配）
+        if n.contains("米白") || n.contains("奶白") || n.contains("象牙") || n.contains("珍珠白") {
+            return Color(red: 0.97, green: 0.94, blue: 0.88)
         }
+        if n.contains("白") { return .white }
+
+        // 米色 / 杏色 / 香槟 / 驼色 / 大地
+        if n.contains("米") || n.contains("杏") || n.contains("香槟") || n.contains("驼") || n.contains("大地") {
+            return Color(red: 0.91, green: 0.82, blue: 0.68)
+        }
+
+        // 卡其 / 沙色
+        if n.contains("卡其") || n.contains("沙色") || n.contains("沙褐") {
+            return Color(red: 0.76, green: 0.69, blue: 0.49)
+        }
+
+        // 灰色系（深灰/浅灰/银灰 先匹配）
+        if n.contains("深灰") || n.contains("炭灰") { return Color(red: 0.3, green: 0.3, blue: 0.3) }
+        if n.contains("浅灰") || n.contains("银灰") || n.contains("麻灰") { return Color(red: 0.78, green: 0.78, blue: 0.78) }
+        if n.contains("灰") { return .gray }
+
+        // 红色系（酒红/深红/玫红/枣红 先匹配）
+        if n.contains("酒红") || n.contains("深红") || n.contains("枣红") || n.contains("勃艮第") {
+            return Color(red: 0.55, green: 0.1, blue: 0.2)
+        }
+        if n.contains("玫") || n.contains("粉红") { return Color(red: 1.0, green: 0.4, blue: 0.6) }
+        if n.contains("红") { return .red }
+
+        // 蓝色系（藏蓝/深蓝/海军蓝 先匹配）
+        if n.contains("藏蓝") || n.contains("深蓝") || n.contains("海军") || n.contains("宝蓝") {
+            return Color(red: 0.05, green: 0.1, blue: 0.45)
+        }
+        if n.contains("浅蓝") || n.contains("天蓝") || n.contains("牛仔") { return Color(red: 0.43, green: 0.65, blue: 0.88) }
+        if n.contains("蓝") { return .blue }
+
+        // 绿色系（军绿/墨绿/橄榄绿 先匹配）
+        if n.contains("军绿") || n.contains("墨绿") || n.contains("橄榄") || n.contains("深绿") {
+            return Color(red: 0.2, green: 0.35, blue: 0.18)
+        }
+        if n.contains("浅绿") || n.contains("薄荷") { return Color(red: 0.6, green: 0.87, blue: 0.72) }
+        if n.contains("绿") { return .green }
+
+        // 黄色系
+        if n.contains("姜黄") || n.contains("芥黄") { return Color(red: 0.79, green: 0.66, blue: 0.2) }
+        if n.contains("黄") { return .yellow }
+
+        // 橙色系
+        if n.contains("橙") || n.contains("南瓜") { return .orange }
+        if n.contains("珊瑚") || n.contains("砖红") { return Color(red: 0.91, green: 0.45, blue: 0.35) }
+
+        // 粉色系（薰衣草、淡紫 先匹配）
+        if n.contains("薰衣草") || n.contains("淡紫") { return Color(red: 0.73, green: 0.67, blue: 0.90) }
+        if n.contains("粉") { return .pink }
+
+        // 紫色系
+        if n.contains("紫") { return .purple }
+
+        // 棕色系（咖色、焦糖、巧克力）
+        if n.contains("棕") || n.contains("咖") || n.contains("焦糖") || n.contains("巧克力") || n.contains("褐") {
+            return .brown
+        }
+
+        // 金属色
+        if n.contains("金") { return Color(red: 0.85, green: 0.72, blue: 0.35) }
+        if n.contains("银") { return Color(red: 0.75, green: 0.75, blue: 0.78) }
+
+        return Color(.systemGray3)
     }
 }
 
@@ -399,6 +466,7 @@ struct ColorDistributionView: View {
 
 struct NotWornRecentlyView: View {
     let items: [ClothingItem]
+    @EnvironmentObject var wardrobeVM: WardrobeViewModel
 
     var body: some View {
         List {
@@ -410,13 +478,14 @@ struct NotWornRecentlyView: View {
                 ForEach(items) { item in
                     HStack(spacing: 12) {
                         LocalImageView(path: item.flatLayImagePath ?? item.originalImagePath)
-                            .frame(width: 60, height: 60)
+                            .frame(width: 52, height: 52)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.subCategory ?? item.category ?? "未知")
+                                .font(.subheadline)
                                 .fontWeight(.medium)
-                            Text(item.lastWornDate.map { "上次穿着: \(formatDate($0))" } ?? "从未穿着")
+                            Text(wardrobeVM.lastOutfitDate(for: item).map { "上次穿着: \(formatDate($0))" } ?? "从未加入穿搭")
                                 .font(.caption)
                                 .foregroundColor(.orange)
                         }
@@ -424,6 +493,7 @@ struct NotWornRecentlyView: View {
                 }
             }
         }
+        .font(.subheadline)
         .navigationTitle("近90天未穿")
         .navigationBarTitleDisplayMode(.inline)
     }

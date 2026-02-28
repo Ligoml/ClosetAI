@@ -11,6 +11,7 @@ struct ClothingDetailView: View {
     @State private var editedTags: ClothingTags
     @State private var selectedRelatedOutfit: Outfit?
     @State private var showAllRelatedOutfits = false
+    @State private var showDeleteConfirm = false
 
     init(item: ClothingItem) {
         self.item = item
@@ -27,50 +28,67 @@ struct ClothingDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Custom nav bar — no NavigationView avoids gesture conflict with sheet dismiss
-            ZStack {
-                Text(item.subCategory ?? item.category ?? "服装详情")
-                    .font(.system(size: 15, weight: .semibold))
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .padding(8)
-                    }
-                    Spacer()
-                    Button {
-                        if isEditing { viewModel.updateItem(item, tags: editedTags) }
-                        isEditing.toggle()
-                    } label: {
-                        Image(systemName: isEditing ? "checkmark" : "pencil")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppColors.accent)
-                            .padding(8)
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 12)
-            Divider()
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     imageSection
                     statsSection
                     tagsSection
-
-                    // Related outfits (v2.0 new feature)
                     relatedOutfitsSection
-
                     if !editedTags.notes.isEmpty && !isEditing {
                         notesSection
                     }
                 }
                 .padding(.bottom, 32)
             }
+            .scrollDismissesKeyboard(.immediately)
+            .navigationTitle(item.subCategory ?? item.category ?? "服装详情")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isEditing {
+                        Button {
+                            viewModel.updateItem(item, tags: editedTags)
+                            isEditing = false
+                        } label: {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(AppColors.accent)
+                        }
+                    } else {
+                        Menu {
+                            Button { isEditing = true } label: {
+                                Label("编辑标签", systemImage: "pencil")
+                            }
+                            Button(role: .destructive) {
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("删除单品", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundColor(AppColors.accent)
+                        }
+                    }
+                }
+            }
+            .alert("确认删除？", isPresented: $showDeleteConfirm) {
+                Button("删除单品", role: .destructive) {
+                    viewModel.softDelete(item)
+                    dismiss()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("删除后可在「已删除」中恢复")
+            }
         }
-        .presentationDragIndicator(.visible)
         .sheet(item: $selectedRelatedOutfit) { outfit in
             OutfitDetailView(outfit: outfit)
                 .environmentObject(outfitVM)
@@ -131,7 +149,7 @@ struct ClothingDetailView: View {
         HStack(spacing: 0) {
             statItem(value: "\(viewModel.outfits(containing: item).count)", label: "搭配数")
             Divider().frame(height: 40)
-            statItem(value: item.lastWornDate.map { formatDate($0) } ?? "从未", label: "上次穿着")
+            statItem(value: viewModel.lastOutfitDate(for: item).map { formatDate($0) } ?? "从未", label: "上次穿着")
             Divider().frame(height: 40)
             statItem(value: formatDate(item.createdAt ?? Date()), label: "入橱时间")
         }
@@ -199,9 +217,13 @@ struct ClothingDetailView: View {
         }
     }
 
+    // 与 WardrobeView.CategorySection.all 保持同步
+    private static let categoryOptions = ["上装", "外套", "连衣裙", "下装", "鞋子", "包包", "配饰", "其他"]
+
     private var editableTagsForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            editField(label: "大类", text: $editedTags.category)
+            singleSelectRow(label: "大类", selected: $editedTags.category,
+                            options: Self.categoryOptions)
             editField(label: "小类", text: $editedTags.subCategory)
             editField(label: "图案", text: $editedTags.pattern)
             editField(label: "备注", text: $editedTags.notes)
@@ -215,6 +237,26 @@ struct ClothingDetailView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.caption).foregroundColor(.secondary)
             TextField(label, text: text).textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func singleSelectRow(label: String, selected: Binding<String>, options: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label).font(.caption).foregroundColor(.secondary)
+            FlowLayout(spacing: 8) {
+                ForEach(options, id: \.self) { option in
+                    let isSelected = selected.wrappedValue == option
+                    Button(action: { selected.wrappedValue = option }) {
+                        Text(option)
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(isSelected ? AppColors.accent : Color(.systemGray5))
+                            .foregroundColor(isSelected ? .white : .primary)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
         }
     }
 
@@ -297,7 +339,7 @@ struct ClothingDetailView: View {
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("备注").font(.headline)
-            Text(editedTags.notes).font(.body).foregroundColor(.secondary)
+            Text(editedTags.notes).font(.subheadline).foregroundColor(.secondary)
         }
         .padding(.horizontal, 16)
     }
@@ -322,7 +364,7 @@ struct AllRelatedOutfitsSheet: View {
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(relatedOutfits) { outfit in

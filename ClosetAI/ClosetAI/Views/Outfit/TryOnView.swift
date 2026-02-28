@@ -3,6 +3,7 @@ import PhotosUI
 
 struct TryOnView: View {
     let outfit: OutfitSuggestion
+    var savedOutfit: Outfit? = nil
     @EnvironmentObject var outfitVM: OutfitViewModel
     @Environment(\.dismiss) var dismiss
 
@@ -20,8 +21,11 @@ struct TryOnView: View {
     @State private var comparisonBefore: UIImage?
     @State private var comparisonAfter: UIImage?
 
+    // 用于区分"从磁盘加载"和"新生成"，避免重复保存
+    @State private var tryOnResultLoadedFromDisk = false
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             // ── Tab 选择器放在 ScrollView 外面，永远可见 ──
             VStack(spacing: 0) {
                 tabSelector
@@ -68,18 +72,37 @@ struct TryOnView: View {
                 }
             }
             .onAppear {
-                if personImage == nil,
+                var pi: UIImage? = personImage
+                if pi == nil,
                    let filename = UserDefaults.standard.string(forKey: "closetai.modelPhotoFilename"),
                    let raw = ImageProcessingService.shared.loadImage(from: filename) {
-                    personImage = centerCrop(raw, to: CGSize(width: 768, height: 1280))
+                    pi = centerCrop(raw, to: CGSize(width: 768, height: 1280))
+                    personImage = pi
+                }
+                // 加载已保存的试穿结果
+                if let resultOutfit = savedOutfit,
+                   let resultPath = resultOutfit.tryOnResultPath,
+                   let savedResult = ImageProcessingService.shared.loadImage(from: resultPath) {
+                    tryOnResultLoadedFromDisk = true
+                    outfitVM.tryOnResultImage = savedResult
+                    if let person = pi {
+                        buildComparisonImages(person: person, result: savedResult)
+                    }
+                    activeTab = 1 // 直接跳到试穿 tab
                 }
             }
-            .onChange(of: outfitVM.tryOnResultImage) { result in
-                if let result = result, let person = personImage {
+            .onChange(of: outfitVM.tryOnResultImage) { _, result in
+                guard let result else { return }
+                if let person = personImage {
                     buildComparisonImages(person: person, result: result)
                 }
+                // 新生成的结果才自动保存（磁盘加载的不重复写入）
+                if !tryOnResultLoadedFromDisk, let outfit = savedOutfit {
+                    outfitVM.saveTryOnResult(result, for: outfit)
+                }
+                tryOnResultLoadedFromDisk = false
             }
-            .onChange(of: personImage) { _ in
+            .onChange(of: personImage) { _, _ in
                 outfitVM.tryOnResultImage = nil
                 comparisonBefore = nil
                 comparisonAfter = nil
@@ -90,6 +113,7 @@ struct TryOnView: View {
                 Text("请先在「拼接效果图」页面生成穿搭图，再保存")
             }
         }
+        .errorToast($outfitVM.errorMessage)
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPickerView(images: Binding(
                 get: { personImage.map { [$0] } ?? [] },
@@ -245,11 +269,14 @@ struct TryOnView: View {
                 .padding(.horizontal, 16)
 
             } else if let before = comparisonBefore, let after = comparisonAfter {
-                ComparisonSlider(beforeImage: before, afterImage: after)
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(768.0 / 1280.0, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 16)
+                ZStack {
+                    Color(.systemGray6)
+                    ComparisonSlider(beforeImage: before, afterImage: after)
+                        .aspectRatio(768.0 / 1280.0, contentMode: .fit)
+                }
+                .frame(maxWidth: .infinity, maxHeight: 340)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
 
                 if let result = outfitVM.tryOnResultImage {
                     Button {
@@ -271,7 +298,7 @@ struct TryOnView: View {
                     Image(uiImage: person)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, maxHeight: 340)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal, 16)
                     Button {
@@ -328,12 +355,6 @@ struct TryOnView: View {
                 .padding(.horizontal, 16)
             }
 
-            if let error = outfitVM.errorMessage {
-                Text(error)
-                    .foregroundColor(.red)
-                    .font(.caption)
-                    .padding(.horizontal, 16)
-            }
         }
     }
 
@@ -398,7 +419,13 @@ struct TryOnView: View {
         if let collage = collageImage,
            let path = ImageProcessingService.shared.saveImageToDocuments(
                collage, filename: "\(outfit.id.uuidString)_collage.jpg") {
-            outfitVM.saveOutfit(outfit, collagePath: path, name: name, occasion: saveOccasion)
+            outfitVM.saveOutfit(
+                outfit,
+                collagePath: path,
+                name: name,
+                occasion: saveOccasion,
+                tryOnResult: outfitVM.tryOnResultImage   // 若已生成上身图则一并保存
+            )
         }
         dismiss()
     }
@@ -419,7 +446,7 @@ struct SaveOutfitSheet: View {
     let onCancel: () -> Void
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section("穿搭名称（可选）") {
                     TextField("默认按「月份 + 场合」命名", text: $outfitName)

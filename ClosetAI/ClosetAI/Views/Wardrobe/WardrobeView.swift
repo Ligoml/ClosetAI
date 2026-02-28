@@ -8,7 +8,9 @@ private struct CategorySection {
     let isOther: Bool
 
     static let all: [CategorySection] = [
-        CategorySection(name: "上装", categories: ["上装", "外套", "连衣裙"], isOther: false),
+        CategorySection(name: "上装", categories: ["上装"], isOther: false),
+        CategorySection(name: "外套", categories: ["外套"], isOther: false),
+        CategorySection(name: "连衣裙", categories: ["连衣裙"], isOther: false),
         CategorySection(name: "下装", categories: ["下装"], isOther: false),
         CategorySection(name: "鞋子", categories: ["鞋子"], isOther: false),
         CategorySection(name: "包包", categories: ["包包"], isOther: false),
@@ -36,9 +38,15 @@ struct WardrobeView: View {
     @State private var showAllSectionTitle: String? = nil
     @State private var showAllSectionItems: [ClothingItem] = []
     @State private var showSearch = false
+    @State private var itemToDelete: ClothingItem? = nil
+    @State private var showNoAPIKeyAlert = false
+
+    private var hasAPIKey: Bool {
+        !(KeychainHelper.load(for: KeychainKey.dashscopeAPIKey) ?? "").isEmpty
+    }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color(.systemGray6).ignoresSafeArea()
 
@@ -67,6 +75,7 @@ struct WardrobeView: View {
                         }
                         .padding(.bottom, 100) // Space for FAB
                     }
+                    .scrollDismissesKeyboard(.immediately)
                 }
 
                 // Loading toast
@@ -82,7 +91,7 @@ struct WardrobeView: View {
                 }
             }
             .navigationTitle("衣橱")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     trashButton
@@ -91,21 +100,31 @@ struct WardrobeView: View {
                     searchButton
                 }
             }
-            .onChange(of: selectedImage) { image in
+            .onChange(of: selectedImage) { _, image in
                 guard let image = image else { return }
                 selectedImage = nil
                 Task { await viewModel.processAndAddItem(image: image) }
             }
-            .alert("错误", isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )) {
-                Button("确定") { viewModel.errorMessage = nil }
+            .alert("请先配置 API Key", isPresented: $showNoAPIKeyAlert) {
+                Button("好的") {}
             } message: {
-                Text(viewModel.errorMessage ?? "")
+                Text("请先在「设置」页面填写阿里云 DashScope API Key，再上传服装")
+            }
+            .alert("确认删除？", isPresented: Binding(
+                get: { itemToDelete != nil },
+                set: { if !$0 { itemToDelete = nil } }
+            )) {
+                Button("删除单品", role: .destructive) {
+                    if let item = itemToDelete { viewModel.softDelete(item) }
+                    itemToDelete = nil
+                }
+                Button("取消", role: .cancel) { itemToDelete = nil }
+            } message: {
+                Text("删除后可在「已删除」中恢复")
             }
         }
-        // FAB overlay (outside NavigationView for proper layering)
+        .errorToast($viewModel.errorMessage)
+        // FAB overlay (outside NavigationStack for proper layering)
         .overlay(alignment: .bottomTrailing) {
             fabButton
         }
@@ -229,9 +248,9 @@ struct WardrobeView: View {
                         .onTapGesture { selectedItem = item }
                         .contextMenu {
                             Button(role: .destructive) {
-                                viewModel.softDelete(item)
+                                itemToDelete = item
                             } label: {
-                                Label("删除", systemImage: "trash")
+                                Label("删除单品", systemImage: "trash")
                             }
                         }
                     }
@@ -274,9 +293,9 @@ struct WardrobeView: View {
                         .onTapGesture { selectedItem = item }
                         .contextMenu {
                             Button(role: .destructive) {
-                                viewModel.softDelete(item)
+                                itemToDelete = item
                             } label: {
-                                Label("删除", systemImage: "trash")
+                                Label("删除单品", systemImage: "trash")
                             }
                         }
                     }
@@ -290,15 +309,16 @@ struct WardrobeView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Spacer(minLength: 60)
-            Image(systemName: "tshirt")
-                .font(.system(size: 60))
+            Image(systemName: "hanger")
+                .font(.system(size: 52))
                 .foregroundColor(Color(.systemGray4))
             Text("衣橱还是空的")
-                .font(.title2)
+                .font(.title3)
                 .fontWeight(.medium)
             Text("点击右下角 + 添加第一件衣物")
+                .font(.subheadline)
                 .foregroundColor(.secondary)
             Spacer(minLength: 60)
         }
@@ -308,20 +328,24 @@ struct WardrobeView: View {
 
     private var fabButton: some View {
         Menu {
-            Button { showCamera = true } label: {
+            Button {
+                if hasAPIKey { showCamera = true } else { showNoAPIKeyAlert = true }
+            } label: {
                 Label("拍照", systemImage: "camera")
             }
-            Button { showPhotoPicker = true } label: {
+            Button {
+                if hasAPIKey { showPhotoPicker = true } else { showNoAPIKeyAlert = true }
+            } label: {
                 Label("从相册选择", systemImage: "photo.on.rectangle")
             }
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
-                .frame(width: 56, height: 56)
+                .frame(width: 48, height: 48)
                 .background(AppColors.accent)
                 .clipShape(Circle())
-                .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 4)
+                .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 3)
         }
         .padding(.trailing, 24)
         .padding(.bottom, 32)
@@ -357,6 +381,7 @@ struct WardrobeView: View {
                 .foregroundColor(.secondary)
             TextField("搜索颜色、风格、类别...", text: $viewModel.searchText)
                 .font(.system(size: 14))
+                .onSubmit { UIApplication.dismissKeyboard() }
             if !viewModel.searchText.isEmpty {
                 Button { viewModel.searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -386,6 +411,7 @@ struct WardrobeView: View {
             }
         } label: {
             Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
                 .foregroundColor(.secondary)
         }
     }
@@ -393,6 +419,7 @@ struct WardrobeView: View {
     private var trashButton: some View {
         Button { showDeletedItems = true } label: {
             Image(systemName: "trash")
+                .font(.system(size: 14))
                 .foregroundColor(.secondary)
         }
     }
@@ -408,6 +435,7 @@ struct CategoryGridSheet: View {
     let onDelete: (ClothingItem) -> Void
 
     @Environment(\.dismiss) var dismiss
+    @State private var itemToDelete: ClothingItem? = nil
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -416,7 +444,7 @@ struct CategoryGridSheet: View {
     ]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(items) { item in
@@ -431,9 +459,9 @@ struct CategoryGridSheet: View {
                         }
                         .contextMenu {
                             Button(role: .destructive) {
-                                onDelete(item)
+                                itemToDelete = item
                             } label: {
-                                Label("删除", systemImage: "trash")
+                                Label("删除单品", systemImage: "trash")
                             }
                         }
                     }
@@ -443,6 +471,18 @@ struct CategoryGridSheet: View {
             .background(Color(.systemGray6).ignoresSafeArea())
             .navigationTitle("\(title) · \(items.count)件")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("确认删除？", isPresented: Binding(
+                get: { itemToDelete != nil },
+                set: { if !$0 { itemToDelete = nil } }
+            )) {
+                Button("删除单品", role: .destructive) {
+                    if let item = itemToDelete { onDelete(item) }
+                    itemToDelete = nil
+                }
+                Button("取消", role: .cancel) { itemToDelete = nil }
+            } message: {
+                Text("删除后可在「已删除」中恢复")
+            }
         }
     }
 }
@@ -458,7 +498,7 @@ struct DeletedItemsView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(deletedItems) { item in
                     HStack(spacing: 12) {
