@@ -297,35 +297,33 @@ var notWornRecently: [ClothingItem] {
 | DEVELOPER_DIR | `~/Downloads/Xcode-beta.app/Contents/Developer` |
 | XcodeGen | `brew install xcodegen` |
 | 部署目标 | iOS 26.0+ |
-| Bundle ID | `com.personal.closetai` |
-| Team ID | `KXVGUNBPP6` |
-| 测试设备 | iPhone 13（`00008110-001819DC0C2A801E`，Ligoml） |
+| Bundle ID | `com.example.closetai`（可在 project.yml 中修改） |
+| Team ID | 在 `project.yml` 的 `DEVELOPMENT_TEAM` 填写你的 Apple Team ID |
+| 测试设备 | iPhone 13（iOS 26 beta） |
 
 ### 6.2 标准构建流程
 
 ```bash
-cd "/Users/limengliu/Desktop/衣橱管理/ClosetAI"
+cd /path/to/ClosetAI
 
 # 1. 修改源码后重建 xcodeproj（改 project.yml 时必须）
 xcodegen generate
 
 # 2. 编译
-DEVELOPER_DIR=~/Downloads/Xcode-beta.app/Contents/Developer \
 xcodebuild \
   -project ClosetAI.xcodeproj \
   -scheme ClosetAI \
   -destination 'generic/platform=iOS' \
   -configuration Debug \
-  DEVELOPMENT_TEAM=KXVGUNBPP6 \
+  DEVELOPMENT_TEAM=<YOUR_TEAM_ID> \
   CODE_SIGN_STYLE=Automatic \
   -allowProvisioningUpdates \
   build
 
-# 3. 部署到真机
-DEVELOPER_DIR=~/Downloads/Xcode-beta.app/Contents/Developer \
+# 3. 部署到真机（UDID 可通过 xcrun devicectl list devices 获取）
 xcrun devicectl device install app \
-  --device 00008110-001819DC0C2A801E \
-  "/Users/limengliu/Library/Developer/Xcode/DerivedData/ClosetAI-emvwmfnovkvvsceqwcecxlvrbcuy/Build/Products/Debug-iphoneos/ClosetAI.app"
+  --device <YOUR_DEVICE_UDID> \
+  "~/Library/Developer/Xcode/DerivedData/ClosetAI-.../Build/Products/Debug-iphoneos/ClosetAI.app"
 ```
 
 ### 6.3 语法快速检查（无需完整构建）

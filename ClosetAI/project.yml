@@ -1,6 +1,6 @@
 name: ClosetAI
 options:
-  bundleIdPrefix: com.personal
+  bundleIdPrefix: com.example
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
@@ -39,10 +39,10 @@ targets:
           - UIInterfaceOrientationPortrait
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.personal.closetai
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.closetai
         SWIFT_VERSION: "5.9"
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
-        DEVELOPMENT_TEAM: KXVGUNBPP6
+        DEVELOPMENT_TEAM: ""   # Set your own Apple Developer Team ID here
         CODE_SIGN_STYLE: Automatic
         CODE_SIGNING_REQUIRED: "YES"
         CODE_SIGNING_ALLOWED: "YES"
