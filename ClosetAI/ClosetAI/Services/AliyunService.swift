@@ -220,7 +220,6 @@ class AliyunService: ObservableObject {
             .joined(separator: "、")
 
         let prompt = """
-        你是一个服装搭配大师，擅长根据用户提供的单品图生成一张时尚的穿搭图。\
         请将上方 \(n) 张服装图（\(itemList)）平铺展示在纯白背景上，生成一张时尚 flat lay 穿搭图。\
         【强制布局约束·违反视为生成失败】\
         ①画面服装总数严格等于 \(n) 件，不多不少；\
