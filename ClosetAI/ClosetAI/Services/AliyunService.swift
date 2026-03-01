@@ -220,21 +220,18 @@ class AliyunService: ObservableObject {
             .joined(separator: "、")
 
         let prompt = """
-        Arrange the \(n) clothing items shown above (\(itemList)) on a pure white background \
-        to create a stylish flat lay outfit photo. \
-        [MANDATORY LAYOUT RULES — violation = generation failure] \
-        (1) The total number of garments in the image must be exactly \(n), no more, no less; \
-        (2) Each garment must appear exactly once — no duplicates — strictly enforced; \
-        (3) Do not add any garments or accessories not present in the input images; \
-        (4) Preserve each item's original color, pattern, style, and length exactly — no modifications. \
-        [Visual Style] \
-        Pure white background, clean and minimal; \
-        arrange items in real dressing order (outerwear over tops, tops over bottoms, shoes and accessories around) \
-        to simulate how the outfit would look when worn; \
-        pieces overlap naturally, each rotated 5–15° for dynamism; \
-        soft diffused lighting with subtle shadows for depth and texture; \
-        the overall composition should feel artistic and aspirational, \
-        inspired by high-end fashion magazine flat lay editorials.
+        请将上方 \(n) 张服装图（\(itemList)）平铺展示在纯白背景上，生成一张时尚 flat lay 穿搭图。\
+        【强制布局约束·违反视为生成失败】\
+        ①画面服装总数严格等于 \(n) 件，不多不少；\
+        ②每件服装在画面中恰好出现一次，不得重复出现，请严格遵守；\
+        ③不得添加任何输入图之外的服装或配件；\
+        ④每件保持原图颜色、图案、款式、长度完全不变，不得修改任何细节。\
+        【视觉风格】\
+        纯白背景，整洁干净；\
+        按照真实穿着顺序排布，模拟真实上身穿着效果；\
+        衣物之间自然错落、轻微叠压，可旋转 5-15 度增加动感；\
+        柔和漫射光源，衣物边缘有轻微投影；\
+        整体画面富有艺术感，风格参考高端时尚杂志 flat lay 大片。
         """
         return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
     }
