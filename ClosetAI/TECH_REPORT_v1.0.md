@@ -2,7 +2,7 @@
 
 > 编写时间：2026-02-27
 > 版本：v1.0（首次可交付版本）
-> 项目路径：`/Users/limengliu/Desktop/衣橱管理/ClosetAI/`
+> 项目路径：`<project-root>/ClosetAI/`
 
 ---
 
