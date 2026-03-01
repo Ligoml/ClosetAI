@@ -219,29 +219,16 @@ class AliyunService: ObservableObject {
             .map { "图\($0.offset + 1)=\($0.element)" }
             .joined(separator: "、")
 
-        // 为每件衣物指定明确的画面位置，避免模型自由发挥时重复绘制同一件
-        let positionHint: String
-        switch n {
-        case 1:
-            positionHint = "图1居中放置。"
-        case 2:
-            positionHint = "图1置于左侧；图2置于右侧。"
-        case 3:
-            positionHint = "图1置于上方居中；图2置于左下方；图3置于右下方。"
-        default:
-            positionHint = "图1置于左上方；图2置于右上方；图3置于左下方；图4置于右下方。"
-        }
-
         let prompt = """
         将上方 \(n) 张服装图（\(itemList)）平铺展示在纯白背景上，生成一张时尚 flat lay 穿搭图。\
         【强制布局约束·违反视为生成失败】\
         ①画面服装总数严格等于 \(n) 件，不多不少；\
-        ②每张输入图在画面中恰好出现一次，严禁将同一件服装重复绘制两次或以上；\
+        ②每件服装在画面中恰好出现一次，不要出现两次或以上；\
         ③不得添加任何输入图之外的服装或配件；\
-        ④位置指定（必须严格执行）：\(positionHint)\
-        ⑤每件保持原图颜色、图案、款式、长度完全不变，不得修改任何细节。\
+        ④每件保持原图颜色、图案、款式、长度完全不变，不得修改任何细节。\
         【视觉风格】\
-        纯白背景，整洁干净；各衣物可旋转 5-15 度增加动感；\
+        纯白背景，整洁干净；根据服装类别自然排布（上装居上、下装居中、鞋包居下）；\
+        衣物之间自然错落、轻微叠压，可旋转 5-15 度增加动感；\
         柔和漫射光源，衣物边缘有轻微投影；整体风格参考高端时尚杂志 flat lay 大片。
         """
         return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
