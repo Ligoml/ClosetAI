@@ -167,7 +167,7 @@ struct OutfitView: View {
 // MARK: - Outfit Collage Card (140×160, image-only)
 
 struct OutfitCollageCard: View {
-    let outfit: Outfit
+    @ObservedObject var outfit: Outfit
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {

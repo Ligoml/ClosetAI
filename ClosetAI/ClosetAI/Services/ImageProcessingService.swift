@@ -27,17 +27,12 @@ class ImageProcessingService {
         return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
     }
 
-    // MARK: - Remove Background
+    // MARK: - Remove Background (iOS 17+ / deployment target iOS 26)
 
     func removeBackground(from image: UIImage) async -> UIImage {
-        if #available(iOS 17.0, *) {
-            return await removeBackgroundiOS17(from: image)
-        } else {
-            return await removeBackgroundFallback(from: image)
-        }
+        return await removeBackgroundiOS17(from: image)
     }
 
-    @available(iOS 17.0, *)
     private func removeBackgroundiOS17(from image: UIImage) async -> UIImage {
         // Normalize orientation first so Vision sees the image right-side-up
         let normalized = normalizeOrientation(image)
@@ -80,22 +75,6 @@ class ImageProcessingService {
         let normalized = UIGraphicsGetImageFromCurrentImageContext() ?? image
         UIGraphicsEndImageContext()
         return normalized
-    }
-
-    private func removeBackgroundFallback(from image: UIImage) async -> UIImage {
-        // iOS 16 fallback: use Vision saliency to approximate foreground
-        guard let cgImage = image.cgImage else { return image }
-        let request = VNGenerateObjectnessBasedSaliencyImageRequest()
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-
-        do {
-            try handler.perform([request])
-            // For iOS 16, return the image as-is (saliency doesn't give a clean mask)
-            // In production, integrate Core ML rembg-small model here
-            return image
-        } catch {
-            return image
-        }
     }
 
     // MARK: - Generate Flat Lay Image (1024x1024)

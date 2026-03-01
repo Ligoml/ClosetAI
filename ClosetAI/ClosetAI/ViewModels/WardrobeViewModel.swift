@@ -134,12 +134,13 @@ class WardrobeViewModel: ObservableObject {
         await MainActor.run { isLoading = true; errorMessage = nil }
         do {
             let preprocessed = imageService.preprocessImage(image)
-            let noBG = await imageService.removeBackground(from: preprocessed)
-            let flatLay = imageService.generateFlatLayImage(from: noBG)
-            guard imageService.checkQuality(of: flatLay) else {
-                await MainActor.run { errorMessage = "图片质量不佳，请重新拍摄"; isLoading = false }
+            // Minimum size guard — catches blank/accidental captures before expensive processing
+            guard let cg = preprocessed.cgImage, cg.width > 100, cg.height > 100 else {
+                await MainActor.run { errorMessage = "图片太小，请重新拍摄"; isLoading = false }
                 return
             }
+            let noBG = await imageService.removeBackground(from: preprocessed)
+            let flatLay = imageService.generateFlatLayImage(from: noBG)
             let itemID = UUID()
             let originalFilename = "\(itemID.uuidString)_original.jpg"
             let flatLayFilename = "\(itemID.uuidString)_flatlay.jpg"

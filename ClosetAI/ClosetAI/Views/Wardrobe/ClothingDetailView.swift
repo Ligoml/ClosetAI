@@ -390,7 +390,7 @@ struct AllRelatedOutfitsSheet: View {
 // MARK: - Related Outfit Card
 
 struct RelatedOutfitCard: View {
-    let outfit: Outfit
+    @ObservedObject var outfit: Outfit
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
