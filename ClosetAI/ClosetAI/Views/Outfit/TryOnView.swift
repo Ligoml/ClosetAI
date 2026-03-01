@@ -110,7 +110,7 @@ struct TryOnView: View {
             .alert("需要先生成拼接图", isPresented: $showNoCollageAlert) {
                 Button("好的") {}
             } message: {
-                Text("请先在「拼接效果图」页面生成穿搭图，再保存")
+                Text("请先在「平铺组合」页面生成穿搭图，再保存")
             }
         }
         .errorToast($outfitVM.errorMessage)
@@ -142,7 +142,7 @@ struct TryOnView: View {
 
     private var tabSelector: some View {
         HStack(spacing: 0) {
-            tabButton(title: "拼接效果图", index: 0)
+            tabButton(title: "平铺组合", index: 0)
             tabButton(title: "虚拟试穿",   index: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
