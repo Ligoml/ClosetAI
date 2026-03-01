@@ -1,5 +1,7 @@
 # ClosetAI
 
+> 🤖 本项目 100% 由 AI 构建，欢迎各位开发者自由使用。如果在使用过程中遇到任何问题，建议直接去问问 AI —— 毕竟它比我更了解这段代码。
+
 > An AI-powered wardrobe management iOS app built with SwiftUI. Automatically tag your clothing with AI, create outfit collages, and try on outfits virtually — all on-device with your own API key.
 
 [![Swift](https://img.shields.io/badge/Swift-5.9-orange)](https://swift.org)
