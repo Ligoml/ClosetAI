@@ -1,7 +1,7 @@
 # ClosetAI v2.0 技术报告
 
 > 编写时间：2026-02-28（最后更新：2026-03-01）
-> 版本：v2.0（功能完善版）+ v2.0.1 补丁
+> 版本：v2.0（功能完善版）+ v2.0.1 补丁 + v2.0.2 补丁
 > 基于版本：v1.0 → v2.0 增量迭代
 > 项目路径：`/Users/limengliu/Desktop/衣橱管理/ClosetAI/`
 
@@ -375,6 +375,14 @@ swiftc -parse ClosetAI/Views/Outfit/TryOnView.swift
 | `ViewModels/WardrobeViewModel.swift` | 移除 checkQuality 调用，改为原图最小尺寸保护 |
 | `Services/ImageProcessingService.swift` | 删除 iOS 16 死代码 removeBackgroundFallback |
 
+**v2.0.2 补丁修改文件（2026-03-01）**：
+
+| 文件 | 改动摘要 |
+|------|----------|
+| `Views/Outfit/TryOnView.swift` | Tab 标签「拼接效果图」→「平铺组合」，alert 文字同步 |
+| `ViewModels/OutfitViewModel.swift` | 2 件穿搭绕过直接多图 API，走 Core Graphics→enhanceCollage 路径 |
+| `Services/AliyunService.swift` | generateAICollage prompt 新增硬规则②：每件只出现一次，严禁重复 |
+
 ---
 
 ## 八、v2.0.1 补丁修复（2026-03-01）
@@ -502,6 +510,82 @@ guard let cg = preprocessed.cgImage, cg.width > 100, cg.height > 100 else {
 
 ---
 
+## 八·二、v2.0.2 补丁修复（2026-03-01）
+
+v2.0.1 后发现的 3 个问题，已合并为单次 commit 修复：
+
+### 8.2.1 穿搭效果页 Tab 标签名称
+
+**问题**：Tab 第一项显示「拼接效果图」，与功能描述（平铺 flat lay 展示）不贴切，且「拼接」暗示简单剪辑，弱化了 AI 生图的价值。
+
+**修复**：Tab 标签改为「**平铺组合**」，alert 引用文字同步更新。
+
+**影响文件**：`Views/Outfit/TryOnView.swift`
+
+---
+
+### 8.2.2 2 件穿搭 AI 合成 API 失败
+
+**问题**：穿搭仅含 2 件单品时，点击「生成穿搭平铺图」触发 API 失败（HTTP 错误）。
+
+**根因**：wan2.6-image 多图生成接口对恰好 2 张图的输入支持有限——接口期望 1 张（单图编辑/增强）或 3-4 张（多单品组合生成）。传入 2 张时，模型返回错误。
+
+**修复**：在 `OutfitViewModel.generateCollage()` 中增加 `imageDatas.count == 2` 分支：
+
+```swift
+if imageDatas.count == 2 {
+    // 先 Core Graphics 合成 → 再 AI 单图增强（1 张输入，接口稳定支持）
+    let cgComposite = imageService.generateOutfitCollage(items: fallbackItems)
+    if let cgData = cgComposite.jpegData(compressionQuality: 0.85) {
+        let enhancedData = try await aliyunService.enhanceCollage(baseCollageData: cgData)
+        if let enhanced = UIImage(data: enhancedData) { return enhanced }
+    }
+    return cgComposite   // AI 增强失败时回退到 Core Graphics 图
+} else {
+    // 1 件或 3-4 件：直接走 generateAICollage（多图合成）
+    let resultData = try await aliyunService.generateAICollage(
+        imageDatas: imageDatas,
+        itemDescriptions: itemDescriptions
+    )
+    if let aiImage = UIImage(data: resultData) { return aiImage }
+}
+```
+
+| 件数 | 新路径 |
+|------|--------|
+| 1 件 | `generateAICollage`（单图 AI 生成） |
+| **2 件** | Core Graphics 合成 → `enhanceCollage`（AI 单图增强）← 新增 |
+| 3-4 件 | `generateAICollage`（多图 AI 合成，维持原逻辑） |
+
+**影响文件**：`ViewModels/OutfitViewModel.swift`
+
+---
+
+### 8.2.3 AI 生成重复单品
+
+**问题**：AI 生图偶发「重复生成同一件衣服」——模型将视觉最显眼的单品画两次以填充画面。
+
+**根因**：旧 prompt 的硬规则只约束了件数（不多不少），未明确禁止同件重复出现。
+
+**修复**：在 `generateAICollage` prompt 的硬规则中新增第 ② 条，并加强整体措辞：
+
+```
+旧硬规则：
+①画面服装件数必须恰好为N，不多不少；
+②仅使用上方图片中的服装，不得凭空添加任何其他单品；
+③每件保持原图颜色、图案、款式、长度完全不变。
+
+新硬规则（违反即视为生成失败）：
+①画面服装件数恰好为N件，不多不少；
+②每件服装在画面中只能出现一次，严禁将任何一件重复绘制两次或更多次；  ← 新增
+③仅使用以上N张图片中的服装，不得凭空添加未出现在输入图片中的任何单品；
+④每件保持原图颜色、图案、款式、长度完全不变，不得修改任何细节。
+```
+
+**影响文件**：`Services/AliyunService.swift`
+
+---
+
 ## 九、已知问题与局限（v2.0 继承）
 
 | 问题 | 影响 | 建议方案 |
@@ -586,4 +670,4 @@ func lastOutfitDate(for item: ClothingItem) -> Date? {
 
 ---
 
-*本报告覆盖 v2.0 交付状态及 v2.0.1 补丁修复（2026-03-01）。v1.0 基础架构细节（wan2.6 API 格式、图像处理管线、StringArrayTransformer 等）请参阅 `TECH_REPORT_v1.0.md`。*
+*本报告覆盖 v2.0 交付状态及 v2.0.1、v2.0.2 补丁修复（均于 2026-03-01）。v1.0 基础架构细节（wan2.6 API 格式、图像处理管线、StringArrayTransformer 等）请参阅 `TECH_REPORT_v1.0.md`。*
