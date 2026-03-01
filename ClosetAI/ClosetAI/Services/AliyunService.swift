@@ -220,15 +220,21 @@ class AliyunService: ObservableObject {
             .joined(separator: "、")
 
         let prompt = """
-        Create an artistic, editorial-quality fashion flat lay on a pure white background \
-        using the \(n) clothing items provided (\(itemList)). \
-        Arrange them as if laid out on a surface in real dressing order: \
-        outerwear on top, inner tops beneath, bottoms below, shoes and accessories naturally placed around. \
-        The result should feel like a styled shoot from Vogue or Harper's Bazaar — \
-        pieces overlapping organically, slightly angled, with soft directional lighting and subtle shadows that give depth and texture. \
-        Strictly: (1) include exactly \(n) items, no more; \
-        (2) every item appears exactly once, no duplicates; \
-        (3) keep all original colors, patterns, and shapes unchanged.
+        Arrange the \(n) clothing items shown above (\(itemList)) on a pure white background \
+        to create a stylish flat lay outfit photo. \
+        [MANDATORY LAYOUT RULES — violation = generation failure] \
+        (1) The total number of garments in the image must be exactly \(n), no more, no less; \
+        (2) Each garment must appear exactly once — no duplicates — strictly enforced; \
+        (3) Do not add any garments or accessories not present in the input images; \
+        (4) Preserve each item's original color, pattern, style, and length exactly — no modifications. \
+        [Visual Style] \
+        Pure white background, clean and minimal; \
+        arrange items in real dressing order (outerwear over tops, tops over bottoms, shoes and accessories around) \
+        to simulate how the outfit would look when worn; \
+        pieces overlap naturally, each rotated 5–15° for dynamism; \
+        soft diffused lighting with subtle shadows for depth and texture; \
+        the overall composition should feel artistic and aspirational, \
+        inspired by high-end fashion magazine flat lay editorials.
         """
         return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
     }
