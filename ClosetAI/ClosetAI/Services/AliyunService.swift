@@ -220,14 +220,15 @@ class AliyunService: ObservableObject {
             .joined(separator: "、")
 
         let prompt = """
-        将上方 \(n) 张服装单品图（\(itemList)）合成一张高质感时尚大片：\
-        纯白背景，俯视平铺，光影柔和立体；\
-        按照真实穿着顺序排布（外套叠在上装之上，上装叠在下装之上，鞋包配饰自然点缀四周），\
-        模拟真实上身穿着效果，让观者一眼看出完整的穿搭层次；\
-        整体构图饱满、富有层次，风格参考顶级时尚杂志 flat lay 大片。\
-        严格遵守：①画面中服装总数恰好为 \(n) 件；\
-        ②每件单品出现且仅出现一次，不得重复；\
-        ③完整保留原图颜色、图案、款式，不得修改。
+        Create an artistic, editorial-quality fashion flat lay on a pure white background \
+        using the \(n) clothing items provided (\(itemList)). \
+        Arrange them as if laid out on a surface in real dressing order: \
+        outerwear on top, inner tops beneath, bottoms below, shoes and accessories naturally placed around. \
+        The result should feel like a styled shoot from Vogue or Harper's Bazaar — \
+        pieces overlapping organically, slightly angled, with soft directional lighting and subtle shadows that give depth and texture. \
+        Strictly: (1) include exactly \(n) items, no more; \
+        (2) every item appears exactly once, no duplicates; \
+        (3) keep all original colors, patterns, and shapes unchanged.
         """
         return try await callWan26Image(images: imageDatas, prompt: prompt, size: "1024*1024")
     }
