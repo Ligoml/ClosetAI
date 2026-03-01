@@ -13,7 +13,7 @@
 
 ## 📽️ Demo
 
-<video src="showcase.mov" controls width="320"></video>
+<video src="https://github.com/user-attachments/assets/73f9095e-bbaf-4dd1-8f54-b1baae1ff98c" controls width="320"></video>
 
 ---
 
