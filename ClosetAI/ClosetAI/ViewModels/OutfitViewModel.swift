@@ -60,23 +60,13 @@ class OutfitViewModel: ObservableObject {
 
         guard !imageDatas.isEmpty else { return nil }
 
+        // 策略：AI 模型直接合成（视觉效果最佳），Core Graphics 仅作兜底
         do {
-            if imageDatas.count == 2 {
-                // wan2.6 接口对恰好 2 张图的多图输入支持有限，
-                // 改为：先 Core Graphics 合成 → 再 AI 单图增强
-                let cgComposite = imageService.generateOutfitCollage(items: fallbackItems)
-                if let cgData = cgComposite.jpegData(compressionQuality: 0.85) {
-                    let enhancedData = try await aliyunService.enhanceCollage(baseCollageData: cgData)
-                    if let enhanced = UIImage(data: enhancedData) { return enhanced }
-                }
-                return cgComposite
-            } else {
-                let resultData = try await aliyunService.generateAICollage(
-                    imageDatas: imageDatas,
-                    itemDescriptions: itemDescriptions
-                )
-                if let aiImage = UIImage(data: resultData) { return aiImage }
-            }
+            let resultData = try await aliyunService.generateAICollage(
+                imageDatas: imageDatas,
+                itemDescriptions: itemDescriptions
+            )
+            if let aiImage = UIImage(data: resultData) { return aiImage }
         } catch {
             print("AI collage error, falling back to Core Graphics: \(error)")
         }
