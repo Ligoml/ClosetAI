@@ -1,7 +1,7 @@
 # ClosetAI v2.0 技术报告
 
-> 编写时间：2026-02-28
-> 版本：v2.0（功能完善版）
+> 编写时间：2026-02-28（最后更新：2026-03-01）
+> 版本：v2.0（功能完善版）+ v2.0.1 补丁
 > 基于版本：v1.0 → v2.0 增量迭代
 > 项目路径：`/Users/limengliu/Desktop/衣橱管理/ClosetAI/`
 
@@ -365,13 +365,147 @@ swiftc -parse ClosetAI/Views/Outfit/TryOnView.swift
 | `Views/Settings/SettingsView.swift` | 颜色匹配增强，`NotWornRecentlyView` 用 `lastOutfitDate`，键盘收起 |
 | `project.yml` | 新增 `model_person.png` 资源，保持 iOS 26 目标 |
 
+**v2.0.1 补丁修改文件（2026-03-01）**：
+
+| 文件 | 改动摘要 |
+|------|----------|
+| `Views/Wardrobe/WardrobeView.swift` | CategorySection 拆分：上装/外套/连衣裙各独立一行 |
+| `Views/Wardrobe/ClothingDetailView.swift` | 大类编辑改为芯片选择器；RelatedOutfitCard 改 @ObservedObject |
+| `Views/Outfit/OutfitView.swift` | OutfitCollageCard 改 @ObservedObject 修复名称同步 |
+| `ViewModels/WardrobeViewModel.swift` | 移除 checkQuality 调用，改为原图最小尺寸保护 |
+| `Services/ImageProcessingService.swift` | 删除 iOS 16 死代码 removeBackgroundFallback |
+
 ---
 
-## 八、已知问题与局限（v2.0 继承）
+## 八、v2.0.1 补丁修复（2026-03-01）
+
+v2.0 发布后发现的 5 个问题，已在同一 commit 中修复：
+
+### 8.1 衣橱分类行显示错误
+
+**问题**：`WardrobeView.CategorySection.all` 将「上装」「外套」「连衣裙」合并为一个显示行（标签「上装」）。连衣裙上传后被归入上装行，视觉上难以区分。
+
+**根因**：
+```swift
+// 修复前：三类共用同一 CategorySection
+CategorySection(name: "上装", categories: ["上装", "外套", "连衣裙"], isOther: false)
+```
+
+**修复**：拆分为独立行，每个大类对应一个 `CategorySection`：
+```swift
+// 修复后：每类独立一行
+CategorySection(name: "上装",   categories: ["上装"],   isOther: false),
+CategorySection(name: "外套",   categories: ["外套"],   isOther: false),
+CategorySection(name: "连衣裙", categories: ["连衣裙"], isOther: false),
+// ...
+```
+
+**影响文件**：`Views/Wardrobe/WardrobeView.swift`
+
+---
+
+### 8.2 大类编辑 UX：TextField → 芯片选择器
+
+**问题**：编辑标签时，「大类」字段使用 `TextField` 手动输入，用户容易输入非标准值，导致分类混乱。
+
+**修复**：新增 `singleSelectRow()` 函数，使用 `FlowLayout` + Capsule 按钮，与现有的季节/场合多选保持风格一致：
+```swift
+private static let categoryOptions = ["上装", "外套", "连衣裙", "下装", "鞋子", "包包", "配饰", "其他"]
+
+private func singleSelectRow(label: String, selected: Binding<String>, options: [String]) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+        Text(label).font(.caption).foregroundColor(.secondary)
+        FlowLayout(spacing: 8) {
+            ForEach(options, id: \.self) { option in
+                let isSelected = selected.wrappedValue == option
+                Button(action: { selected.wrappedValue = option }) {
+                    Text(option)
+                        .font(.caption)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(isSelected ? AppColors.accent : Color(.systemGray5))
+                        .foregroundColor(isSelected ? .white : .primary)
+                        .clipShape(Capsule())
+                }
+            }
+        }
+    }
+}
+```
+
+**影响文件**：`Views/Wardrobe/ClothingDetailView.swift`
+
+---
+
+### 8.3 穿搭名称修改后衣橱页不同步
+
+**问题**：在穿搭详情修改名称后，衣橱页「搭配记录」卡片（`RelatedOutfitCard`）和穿搭列表卡片（`OutfitCollageCard`）不刷新，仍显示旧名称。
+
+**根因**：两个卡片均使用 `let outfit: Outfit`（CoreData `NSManagedObject` 引用类型）。SwiftUI 对 class 类型做指针对比，对象地址未变则不触发重绘；CoreData 属性变化通过 KVO/Combine 传播，但 SwiftUI 未订阅。
+
+**修复**：改为 `@ObservedObject var outfit: Outfit`，让 SwiftUI 订阅 CoreData 的 KVO → Combine 管道：
+```swift
+// 修复前
+struct OutfitCollageCard: View {
+    let outfit: Outfit
+}
+struct RelatedOutfitCard: View {
+    let outfit: Outfit
+}
+
+// 修复后
+struct OutfitCollageCard: View {
+    @ObservedObject var outfit: Outfit   // 订阅 KVO，属性变化即重绘
+}
+struct RelatedOutfitCard: View {
+    @ObservedObject var outfit: Outfit
+}
+```
+
+**影响文件**：`Views/Outfit/OutfitView.swift`、`Views/Wardrobe/ClothingDetailView.swift`
+
+---
+
+### 8.4 上传图片误报「图片质量不佳」
+
+**问题**：上传小件配饰或浅色衣物时，弹出「图片质量不佳，请重新拍摄」，实际图片完全有效。
+
+**根因**：`ImageProcessingService.checkQuality(of:)` 在 1024×1024 白色背景平铺图上以 ~100pt 步长抽样约 100 个像素点，对非白像素占比设置 5% 阈值。小件/浅色衣物像素面积小，轻易低于阈值。
+
+**修复方案**：完全移除 `checkQuality` 调用，替换为对**预处理前原图**的最小尺寸保护（宽高均 > 100px），仅拦截无效的空白/意外截图：
+```swift
+// 修复前（在平铺图上做质量检测，会误拒合法图片）
+let flatLay = imageService.generateFlatLayImage(from: noBG)
+guard imageService.checkQuality(of: flatLay) else {
+    await MainActor.run { errorMessage = "图片质量不佳，请重新拍摄"; isLoading = false }
+    return
+}
+
+// 修复后（仅在预处理阶段做最小尺寸保护）
+let preprocessed = imageService.preprocessImage(image)
+guard let cg = preprocessed.cgImage, cg.width > 100, cg.height > 100 else {
+    await MainActor.run { errorMessage = "图片太小，请重新拍摄"; isLoading = false }
+    return
+}
+```
+
+**影响文件**：`ViewModels/WardrobeViewModel.swift`
+
+---
+
+### 8.5 清理 iOS 16 死代码
+
+**问题**：`ImageProcessingService` 中存在 `removeBackgroundFallback()` 方法（基于 `VNGenerateObjectnessBasedSaliencyImageRequest`），为 iOS 16 的降级路径，但项目部署目标已为 iOS 26.0，该分支永远不可达。
+
+**修复**：删除 `removeBackgroundFallback()` 及其条件分支，`removeBackground()` 直接调用 `removeBackgroundiOS17()`（即 iOS 26 时代的 `VNGenerateForegroundInstanceMaskRequest`）。同时移除多余的 `@available(iOS 17.0, *)` 标注。
+
+**影响文件**：`Services/ImageProcessingService.swift`
+
+---
+
+## 九、已知问题与局限（v2.0 继承）
 
 | 问题 | 影响 | 建议方案 |
 |------|------|----------|
-| iOS 背景去除质量依赖系统版本 | iOS 26 以下效果有限 | 集成 Core ML rembg 模型，或提高最低系统要求 |
 | wan2.6 偶发超时（>120s） | 平铺图/试穿失败 | 加重试逻辑；平铺图已有 Core Graphics 降级兜底 |
 | 试穿仅传图，无姿态控制 | 效果不稳定 | 探索专用试衣模型（IDM-VTON 或阿里系 CatVTON） |
 | `Outfit.itemIDs` 逗号字符串存储 | 查询不灵活 | 迁移为 Core Data 多对多关系 |
@@ -381,9 +515,9 @@ swiftc -parse ClosetAI/Views/Outfit/TryOnView.swift
 
 ---
 
-## 九、关键代码说明（v2.0 新增）
+## 十、关键代码说明（v2.0 新增）
 
-### 9.1 试穿结果原子保存
+### 10.1 试穿结果原子保存
 
 ```swift
 // OutfitViewModel.saveOutfit（新建穿搭 + 同时写入试穿结果）
@@ -400,7 +534,7 @@ func saveOutfit(_ suggestion: OutfitSuggestion, collagePath: String,
 }
 ```
 
-### 9.2 letterbox ComparisonSlider
+### 10.2 letterbox ComparisonSlider
 
 ```swift
 // TryOnView - 灰色底 + fit 子视图，确保 GeometryReader 拿到精确 3:5 尺寸
@@ -414,7 +548,7 @@ ZStack {
 // 原理：340pt 容器 → fit 计算出 204×340 子帧 → .fill 图片无多余裁切
 ```
 
-### 9.3 「上次穿着」从穿搭推导
+### 10.3 「上次穿着」从穿搭推导
 
 ```swift
 // WardrobeViewModel
@@ -424,7 +558,7 @@ func lastOutfitDate(for item: ClothingItem) -> Date? {
 // 使用：viewModel.lastOutfitDate(for: item) 替代 item.lastWornDate
 ```
 
-### 9.4 ErrorToast（自动消失 + 防重复清除）
+### 10.4 ErrorToast（自动消失 + 防重复清除）
 
 ```swift
 .onAppear {
@@ -440,7 +574,7 @@ func lastOutfitDate(for item: ClothingItem) -> Date? {
 
 ---
 
-## 十、后续开发建议（v3.0 优先级）
+## 十一、后续开发建议（v3.0 优先级）
 
 1. **【高】穿着日历视图**：WearLog 数据已完备，按月展示穿着频次热力图
 2. **【高】阿里云 OSS 云同步**：`ossKey` 字段已预留，实现上传/下载逻辑；搭配 iCloud 备份兜底
@@ -452,4 +586,4 @@ func lastOutfitDate(for item: ClothingItem) -> Date? {
 
 ---
 
-*本报告覆盖 v2.0 交付状态。v1.0 基础架构细节（wan2.6 API 格式、图像处理管线、StringArrayTransformer 等）请参阅 `TECH_REPORT_v1.0.md`。*
+*本报告覆盖 v2.0 交付状态及 v2.0.1 补丁修复（2026-03-01）。v1.0 基础架构细节（wan2.6 API 格式、图像处理管线、StringArrayTransformer 等）请参阅 `TECH_REPORT_v1.0.md`。*

@@ -249,7 +249,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					5F6C289BFB673B13D49B90FA = {
-						DevelopmentTeam = KXVGUNBPP6;
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -384,7 +384,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = KXVGUNBPP6;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_PREVIEWS = NO;
 				INFOPLIST_FILE = ClosetAI/Info.plist;
@@ -393,7 +393,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.personal.closetai;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.closetai;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -473,7 +473,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = KXVGUNBPP6;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_PREVIEWS = NO;
 				INFOPLIST_FILE = ClosetAI/Info.plist;
@@ -482,7 +482,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.personal.closetai;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.closetai;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
