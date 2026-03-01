@@ -9,6 +9,12 @@
 
 ---
 
+## 📽️ Demo
+
+<video src="showcase.mov" controls width="320"></video>
+
+---
+
 ## ✨ Features
 
 ### 衣橱管理（Wardrobe）
